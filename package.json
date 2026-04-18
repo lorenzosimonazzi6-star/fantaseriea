@@ -1,0 +1,8 @@
+{
+  "name": "fantaseriea",
+  "version": "1.0.0",
+  "description": "Fanta Serie A 2025/26",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
