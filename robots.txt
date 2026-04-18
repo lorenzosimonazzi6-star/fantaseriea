@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://fanta-seriea.it/sitemap.xml

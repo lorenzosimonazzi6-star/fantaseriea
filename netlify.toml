@@ -1,0 +1,12 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+
+# Scheduled function — gira ogni 5 minuti
+[functions."scheduled-poller"]
+  schedule = "*/5 * * * *"
