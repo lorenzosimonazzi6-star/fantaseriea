@@ -17,7 +17,17 @@ const RUOLI   = { P:"Portieri", D:"Difensori", C:"Centrocampisti", A:"Attaccanti
 // Rimuove accenti e caratteri speciali per matching robusto
 function normalizeName(s) {
   if (!s) return "";
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return s
+    // Caratteri nordici e speciali non coperti da NFD
+    .replace(/Ø/g, "O").replace(/ø/g, "o")
+    .replace(/Æ/g, "AE").replace(/æ/g, "ae")
+    .replace(/Þ/g, "TH").replace(/þ/g, "th")
+    .replace(/Ð/g, "D").replace(/ð/g, "d")
+    .replace(/Ł/g, "L").replace(/ł/g, "l")
+    .replace(/ß/g, "ss")
+    // Normalizzazione NFD standard (accenti)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().trim();
 }
 
 // Estrae i token significativi da un nome (rimuove iniziali tipo "C." "F.")
@@ -394,7 +404,12 @@ function hasPendingVoti(partId, gId) {
   for (const [, arr] of Object.entries(rosa)) {
     for (const g of arr) {
       const entry = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
-      if (!entry) return true;
+      if (!entry) {
+        // Se la squadra ha già voti per questa giornata → giocatore non convocato (SV auto), non è pending
+        const squadraHaVoti = globalState.voti[g.nazione]?.[gId] &&
+          Object.keys(globalState.voti[g.nazione][gId]).length > 0;
+        if (!squadraHaVoti) return true; // partita non ancora giocata → pending
+      }
     }
   }
   return false;
@@ -535,15 +550,17 @@ function buildGiornata() {
           <span style="margin-left:6px;font-weight:600">${RUOLI[ruolo]} · ${arr.length}</span></td></tr>`;
         const rows = arr.map(g => {
           const entry  = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
+          // Se la squadra ha voti per questa giornata ma il giocatore non c'è → non convocato/SV
+          const squadraHaVoti = globalState.voti[g.nazione]?.[gId] &&
+            Object.keys(globalState.voti[g.nazione][gId]).length > 0;
+          const isSV   = entry?.sv || (!entry && squadraHaVoti);
           const isCap  = cap === g.nome;
-          const isSV   = entry?.sv;
           const v      = entry && !isSV ? parseFloat(entry.v)||0 : null;
           const { bonus, malus } = entry && !isSV ? calcFlagsSeparati(entry.flags||{}, ruolo) : { bonus:0, malus:0 };
           const capBonus = (isCap && ruolo!=="A" && v!==null && v>=7) ? 2 : 0;
           let totV = v !== null ? v + bonus - malus + capBonus : null;
           if (totV !== null) totV = Math.round(totV * 10) / 10;
           const negCls = totV!==null && totV<0 ? " tot-neg" : "";
-          const pending = !entry;
 
           // Celle bonus e malus
           const bonusTot = bonus + capBonus;

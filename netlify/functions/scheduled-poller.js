@@ -203,19 +203,22 @@ function extractFlags(stats, ruolo, goalsAgainst, goalsAgainstPenalty, cardInfo)
   if (cardInfo?.amm) flags.amm = true;
   if (cardInfo?.esp) flags.esp = true;
 
-  // Solo portiere
+  // Solo portiere che ha effettivamente giocato
   if (ruolo === "P") {
-    // Rigore parato
-    const faced  = stats?.penaltyFaced || 0;
-    const rigPar = Math.max(0, faced - (goalsAgainstPenalty || 0));
-    if (rigPar > 0) flags.rigpar = rigPar;
+    const minPlayed = stats?.minutesPlayed || 0;
+    const hasRating = !!(stats?.rating);
+    const hasPlayed = hasRating || minPlayed >= 30; // ha giocato almeno 30 min
 
-    // Porta inviolata: ha giocato e non ha subito gol
-    const hasPlayed = !!(stats?.rating) || (stats?.minutesPlayed || 0) >= 60;
-    if (hasPlayed && goalsAgainst === 0) flags.pi = 1;
+    if (hasPlayed) {
+      // Rigore parato
+      const faced  = stats?.penaltyFaced || 0;
+      const rigPar = Math.max(0, faced - (goalsAgainstPenalty || 0));
+      if (rigPar > 0) flags.rigpar = rigPar;
 
-    // Gol subiti
-    if (goalsAgainst > 0) flags.gs = goalsAgainst;
+      // Porta inviolata e gol subiti solo se ha giocato
+      if (goalsAgainst === 0) flags.pi = 1;
+      if (goalsAgainst > 0) flags.gs = goalsAgainst;
+    }
   }
 
   return flags;
@@ -318,7 +321,7 @@ exports.handler = async function () {
   for (const match of activeMatches) {
     const doPoll = await shouldPoll(db, match.eventId, now);
     if (!doPoll) {
-      console.log(`[poller] ⏭ Skip ${match.home}-${match.away} (polling < 15 min fa)`);
+      console.log(`[poller] ⏭ Skip ${match.home}-${match.away} (polling < 5 min fa)`);
       results.push(`⏭ ${match.home}-${match.away}: skipped`);
       continue;
     }
