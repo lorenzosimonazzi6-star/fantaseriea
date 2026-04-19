@@ -468,33 +468,34 @@ const MATCHES = {
     { eventId: "", home: "Torino",     away: "Verona",      kickoff: "2026-04-12T19:45:00Z" },
   ],
 
-  // ── GIORNATA 33 — 19/04/2026 ─────────────────────────────
+  // ── GIORNATA 33 — 18-19/04/2026 ─────────────────────────
+  // Orari italiani (CEST) convertiti in UTC (-2h)
   "33": [
-    { eventId: "13981743", home: "Cremonese",  away: "Torino",      kickoff: "2026-04-19T12:30:00Z" },
-    { eventId: "", home: "Inter",      away: "Cagliari",    kickoff: "2026-04-18T13:30:00Z" },
-    { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-18T13:30:00Z" },
-    { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-18T13:30:00Z" },
-    { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-18T17:00:00Z" },
-    { eventId: "", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-18T17:00:00Z" },
-    { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-18T17:00:00Z" },
-    { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-18T17:00:00Z" },
-    { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-18T19:45:00Z" },
-    { eventId: "", home: "Verona",     away: "Milan",       kickoff: "2026-04-18T19:45:00Z" },
+    { eventId: "13981743", home: "Cremonese",  away: "Torino",      kickoff: "2026-04-19T10:30:00Z" }, // dom 19/04 ore 12.30 CEST
+    { eventId: "", home: "Inter",      away: "Cagliari",    kickoff: "2026-04-18T11:30:00Z" }, // sab 18/04 ore 13.30 CEST
+    { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-18T11:30:00Z" }, // sab 18/04 ore 13.30 CEST
+    { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-18T11:30:00Z" }, // sab 18/04 ore 13.30 CEST
+    { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
+    { eventId: "", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
+    { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
+    { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
+    { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-18T17:45:00Z" }, // sab 18/04 ore 19.45 CEST
+    { eventId: "", home: "Verona",     away: "Milan",       kickoff: "2026-04-18T17:45:00Z" }, // sab 18/04 ore 19.45 CEST
   ],
 
   // ── GIORNATA 34 — 24-27/04/2026 ──────────────────────────
-  // Orari ufficiali. eventId da inserire quando disponibili su Sofascore.
+  // Orari italiani (CEST) convertiti in UTC (-2h)
   "34": [
-    { eventId: "13980105", home: "Napoli",     away: "Cremonese",   kickoff: "2026-04-24T18:45:00Z" }, // ven 24/04 ore 20.45 CEST
-    { eventId: "13980107", home: "Parma",      away: "Pisa",        kickoff: "2026-04-25T13:00:00Z" }, // sab 25/04 ore 15.00 CEST
-    { eventId: "13980113", home: "Bologna",    away: "Roma",        kickoff: "2026-04-25T16:00:00Z" }, // sab 25/04 ore 18.00 CEST
-    { eventId: "13980114", home: "Verona",     away: "Lecce",       kickoff: "2026-04-25T18:45:00Z" }, // sab 25/04 ore 20.45 CEST 
-    { eventId: "13980110", home: "Fiorentina", away: "Sassuolo",    kickoff: "2026-04-26T10:30:00Z" }, // dom 26/04 ore 12.30 CEST
-    { eventId: "13980109", home: "Genoa",      away: "Como",        kickoff: "2026-04-26T13:00:00Z" }, // dom 26/04 ore 15.00 CEST
-    { eventId: "13980104", home: "Torino",     away: "Inter",       kickoff: "2026-04-26T16:00:00Z" }, // dom 26/04 ore 18.00 CEST 
-    { eventId: "13980106", home: "Milan",      away: "Juventus",    kickoff: "2026-04-26T18:45:00Z" }, // dom 26/04 ore 20.45 CEST
-    { eventId: "13980111", home: "Cagliari",   away: "Atalanta",    kickoff: "2026-04-27T16:30:00Z" }, // lun 27/04 ore 18.30 CEST
-    { eventId: "13980112", home: "Lazio",      away: "Udinese",     kickoff: "2026-04-27T18:45:00Z" }, // lun 27/04 ore 20.45 CEST 
+    { eventId: "13980105", home: "Napoli",     away: "Cremonese",   kickoff: "2026-04-24T16:45:00Z" }, // ven 24/04 ore 18.45 CEST
+    { eventId: "13980107", home: "Parma",      away: "Pisa",        kickoff: "2026-04-25T11:00:00Z" }, // sab 25/04 ore 13.00 CEST
+    { eventId: "13980113", home: "Bologna",    away: "Roma",        kickoff: "2026-04-25T14:00:00Z" }, // sab 25/04 ore 16.00 CEST
+    { eventId: "13980114", home: "Verona",     away: "Lecce",       kickoff: "2026-04-25T16:45:00Z" }, // sab 25/04 ore 18.45 CEST
+    { eventId: "13980110", home: "Fiorentina", away: "Sassuolo",    kickoff: "2026-04-26T08:30:00Z" }, // dom 26/04 ore 10.30 CEST
+    { eventId: "13980109", home: "Genoa",      away: "Como",        kickoff: "2026-04-26T11:00:00Z" }, // dom 26/04 ore 13.00 CEST
+    { eventId: "13980104", home: "Torino",     away: "Inter",       kickoff: "2026-04-26T14:00:00Z" }, // dom 26/04 ore 16.00 CEST
+    { eventId: "13980106", home: "Milan",      away: "Juventus",    kickoff: "2026-04-26T16:45:00Z" }, // dom 26/04 ore 18.45 CEST
+    { eventId: "13980111", home: "Cagliari",   away: "Atalanta",    kickoff: "2026-04-27T14:30:00Z" }, // lun 27/04 ore 16.30 CEST
+    { eventId: "13980112", home: "Lazio",      away: "Udinese",     kickoff: "2026-04-27T16:45:00Z" }, // lun 27/04 ore 18.45 CEST
   ],
 
   // ── GIORNATA 35 — 01-04/05/2026 ──────────────────────────

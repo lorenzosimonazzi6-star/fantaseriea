@@ -118,7 +118,33 @@ function syncLegaToFirebase(){
 }
 function syncGlobalToFirebase(){
   if(!window._fbReady||!window._db)return;
-  try{window._set(window._ref(window._db,"global"),globalState).catch(e=>console.warn("FB:",e));}catch(e){}
+  // Salva tutto global TRANNE giocatoriSquadra (ha il suo path dedicato)
+  const toSave = {...globalState};
+  delete toSave.giocatoriSquadra;
+  try{window._set(window._ref(window._db,"global"),toSave).catch(e=>console.warn("FB:",e));}catch(e){}
+}
+
+// Salva i giocatori in global/giocatori — path dedicato, condiviso tra tutte le leghe
+function saveGiocatoriToFirebase(db){
+  if(!window._fbReady||!window._db)return;
+  try{
+    window._set(window._ref(window._db,"global/giocatori"), globalState.giocatoriSquadra||{})
+      .catch(e=>console.warn("FB giocatori:",e));
+  }catch(e){}
+}
+
+// Ascolta global/giocatori all'avvio — indipendente dalla lega
+let fbGiocatoriListening=false;
+function listenGiocatori(){
+  if(!window._fbReady||!window._db||fbGiocatoriListening)return;
+  fbGiocatoriListening=true;
+  window._onVal(window._ref(window._db,"global/giocatori"),(snap)=>{
+    const d=snap.val();
+    if(!d)return;
+    globalState.giocatoriSquadra=d;
+    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
+    if(currentPage()==="giocatori")renderGiocatoriPage();
+  });
 }
 function syncToFirebase(){syncLegaToFirebase();}
 
@@ -138,12 +164,15 @@ function listenGlobal(){
   window._onVal(window._ref(window._db,"global"),(snap)=>{
     const d=snap.val();if(!d)return;
     if((d._updatedAt||0)<=(globalState._updatedAt||0))return;
+    // Preserva giocatoriSquadra — viene da global/giocatori, non da global/
+    const giocSalvati = globalState.giocatoriSquadra;
     globalState=sanitizeGlobalState(d);
+    globalState.giocatoriSquadra = giocSalvati || globalState.giocatoriSquadra || {};
     localStorage.setItem("fsa_global",JSON.stringify(globalState));
     renderPage(currentPage());showSyncBar("🔄 Dati aggiornati",2000);
   });
 }
-function listenFirebase(){listenGlobal();if(currentLegaId)listenLega(currentLegaId);}
+function listenFirebase(){listenGlobal();listenGiocatori();if(currentLegaId)listenLega(currentLegaId);}
 
 
 function saveLocalOnly() {
@@ -1096,7 +1125,7 @@ function processRosaFile(file) {
         renderCapitanoForm(); renderRoseStatus(); toast("Rosa caricata!");
       } else { res.style.color="var(--red)"; res.textContent="Formato non riconosciuto."; }
     };
-    reader.readAsText(file);
+    reader.readAsText(file, "UTF-8");
   } else {
     res.style.color="var(--accent2)"; res.textContent="Per Excel: salva come CSV poi ricarica.";
   }
@@ -1887,6 +1916,9 @@ function renderSidebar() {
         <div class="field-group"><label>Password</label><input type="password" id="sidebarPwd" placeholder="Password" autocomplete="current-password"></div>
         <button class="btn-primary" id="btnSidebarLogin" style="width:100%">Accedi</button>
         <p class="pwd-error" id="sidebarLoginErr"></p>
+        <p style="text-align:center;margin-top:10px">
+          <a href="#" id="btnForgotPwd" style="color:var(--text2);font-size:13px;text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">Password dimenticata?</a>
+        </p>
       </div>
       <div id="sidebarAuthRegister" class="auth-form" style="display:none">
         <div class="field-group"><label>Nome e Cognome</label><input type="text" id="sidebarNome" placeholder="Es. Mario Rossi" autocomplete="name"></div>
@@ -1917,6 +1949,28 @@ function renderSidebar() {
     });
     document.getElementById("sidebarPwd")?.addEventListener("keydown", e => {
       if(e.key==="Enter") document.getElementById("btnSidebarLogin")?.click();
+    });
+
+    document.getElementById("btnForgotPwd")?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("sidebarEmail").value.trim();
+      const err   = document.getElementById("sidebarLoginErr");
+      if (!email) {
+        err.style.color = "var(--accent)";
+        err.textContent = "Inserisci prima la tua email qui sopra.";
+        return;
+      }
+      try {
+        const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+        await sendPasswordResetEmail(window._fbAuth, email);
+        err.style.color = "var(--green)";
+        err.textContent = "✅ Email di reset inviata! Controlla la casella (anche spam).";
+      } catch(ex) {
+        err.style.color = "var(--red)";
+        err.textContent = ex.code === "auth/user-not-found"
+          ? "❌ Nessun account trovato con questa email."
+          : "❌ Errore nell'invio. Riprova.";
+      }
     });
 
     document.getElementById("btnSidebarRegister")?.addEventListener("click", async () => {
@@ -2312,9 +2366,9 @@ function renderSuperadminPage() {
     const file = this.files[0];
     if (!file) return;
     document.getElementById("superGiocatoriFileName").textContent = file.name;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const result = parseSuperGiocatoriCSV(e.target.result);
+
+    function processCSV(text) {
+      const result = parseSuperGiocatoriCSV(text);
       const resEl = document.getElementById("superGiocatoriResult");
       const previewEl = document.getElementById("superGiocatoriPreview");
       const btnCarica = document.getElementById("btnSuperCaricaGiocatori");
@@ -2332,7 +2386,6 @@ function renderSuperadminPage() {
       resEl.style.color = "var(--green)";
       resEl.textContent = `✓ ${nGioc} giocatori in ${nSquadre} squadre – pronti per il caricamento.`;
       btnCarica.disabled = false;
-      // Mostra anteprima
       previewEl.innerHTML = `<details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Mostra anteprima (prime 5 squadre)</summary>
         <div style="font-size:12px;margin-top:8px;max-height:260px;overflow:auto">
@@ -2341,8 +2394,23 @@ function renderSuperadminPage() {
           ).join('<br>')}
         </div>
       </details>`;
+    }
+
+    // Prova UTF-8 prima, poi Latin-1 come fallback per file Excel ANSI
+    const readerUtf8 = new FileReader();
+    readerUtf8.onload = e => {
+      const text = e.target.result;
+      // Controlla se ci sono caratteri di sostituzione UTF-8 (segno di encoding errato)
+      if (text.includes('\uFFFD') || /[\x80-\x9F]/.test(text)) {
+        // Rileggi in Latin-1
+        const readerLatin = new FileReader();
+        readerLatin.onload = e2 => processCSV(e2.target.result);
+        readerLatin.readAsText(file, "ISO-8859-1");
+      } else {
+        processCSV(text);
+      }
     };
-    reader.readAsText(file);
+    readerUtf8.readAsText(file, "UTF-8");
   });
 
   document.getElementById("btnSuperCaricaGiocatori")?.addEventListener("click", async () => {
@@ -2352,11 +2420,16 @@ function renderSuperadminPage() {
     btn.disabled = true; btn.textContent = "⏳ Caricamento...";
     try {
       globalState.giocatoriSquadra = _giocatoriParsed;
-      saveGlobalState();
+      // Salva in global/giocatori — path dedicato condiviso tra tutte le leghe
+      saveGiocatoriToFirebase();
+      try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
+      const nGioc = Object.values(_giocatoriParsed).flat().length;
+      const nSq   = Object.keys(_giocatoriParsed).length;
       resEl.style.color = "var(--green)";
-      resEl.textContent = `✅ Database caricato! ${Object.values(_giocatoriParsed).flat().length} giocatori in ${Object.keys(_giocatoriParsed).length} squadre.`;
+      resEl.textContent = `✅ Database caricato! ${nGioc} giocatori in ${nSq} squadre. Visibile a tutte le leghe.`;
       toast("Database giocatori aggiornato!");
       btn.textContent = "⬆️ Carica nel Database";
+      btn.disabled = false;
     } catch(e) {
       resEl.style.color = "var(--red)";
       resEl.textContent = "❌ Errore: " + e.message;
@@ -2367,7 +2440,8 @@ function renderSuperadminPage() {
   document.getElementById("btnSuperSvuotaGiocatori")?.addEventListener("click", async () => {
     if (!confirm("Svuotare il database dei giocatori? Questa azione è irreversibile.")) return;
     globalState.giocatoriSquadra = {};
-    saveGlobalState();
+    saveGiocatoriToFirebase();
+    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
     const resEl = document.getElementById("superGiocatoriResult");
     resEl.style.color = "var(--orange)";
     resEl.textContent = "Database giocatori svuotato.";
@@ -3076,11 +3150,14 @@ if (_hamb) _hamb.style.display = "none";
 
 function startApp() {
   listenGlobal();
+  listenGiocatori(); // ascolta global/giocatori indipendentemente dalla lega
   if (window._fbReady && window._db) {
     window._onVal(window._ref(window._db,"global"), snap=>{
       const d=snap.val();
       if(d&&(d._updatedAt||0)>(globalState._updatedAt||0)){
+        const giocSalvati = globalState.giocatoriSquadra;
         globalState=sanitizeGlobalState(d);
+        globalState.giocatoriSquadra = giocSalvati || globalState.giocatoriSquadra || {};
         localStorage.setItem("fsa_global",JSON.stringify(globalState));
       }
       // Check URL for lega param
