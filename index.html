@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fanta Serie A 2025/26 – Il Fantacalcio della Serie A</title>
+  <title>Fanta Serie A 2025/26 – Il Fantacalcio della Serie A tra amici</title>
 
   <!-- Copyright -->
   <meta name="author" content="Lorenzo Simonazzi">
@@ -12,8 +12,8 @@
   <meta name="robots" content="index, follow">
 
   <!-- SEO -->
-  <meta name="description" content="Fanta Serie A 2025/26 – Il fantacalcio della Serie A italiana. Costruisci la tua rosa di 20 giocatori, scegli il capitano e sfida i tuoi amici per tutta la stagione!">
-  <meta name="keywords" content="fanta serie a, fantacalcio serie a 2025 2026, fanta calcio italiano, fantacalcio amici, serie a fantasy">
+  <meta name="description" content="Fanta Serie A 2025/26: il fantacalcio gratuito della Serie A italiana. Crea la tua lega privata, scegli 20 giocatori — uno per squadra — e sfida i tuoi amici tutta la stagione. Voti Sofascore, aggiornamento live.">
+  <meta name="keywords" content="fanta serie a, fantacalcio serie a, fanta calcio serie a 2025 2026, fantacalcio gratis amici, fanta serie a gratis, fantacalcio italiano, fantasy football serie a, fanta calcio lega privata">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://fanta-seriea.it/">
 
@@ -22,20 +22,41 @@
   <link rel="apple-touch-icon" href="/logo.png">
 
   <!-- Open Graph (WhatsApp, Facebook, ecc.) -->
-  <meta property="og:title" content="Fanta Serie A 2025/26 – Il Fantacalcio della Serie A">
-  <meta property="og:description" content="Costruisci la tua rosa di 20 giocatori, scegli il capitano e sfida i tuoi amici per tutta la stagione!">
+  <meta property="og:title" content="Fanta Serie A 2025/26 – Il Fantacalcio della Serie A tra amici">
+  <meta property="og:description" content="Crea la tua lega privata, scegli 20 giocatori — uno per squadra — e sfida i tuoi amici per tutta la stagione di Serie A. Gratis, con voti Sofascore live.">
   <meta property="og:url" content="https://fanta-seriea.it/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Fanta Serie A 2025/26">
   <meta property="og:image" content="https://fanta-seriea.it/logo.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="720">
+  <meta property="og:locale" content="it_IT">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Fanta Serie A 2025/26 – Il Fantacalcio della Serie A">
-  <meta name="twitter:description" content="Costruisci la tua rosa di 20 giocatori e sfida i tuoi amici per tutta la stagione!">
+  <meta name="twitter:title" content="Fanta Serie A 2025/26 – Il Fantacalcio della Serie A tra amici">
+  <meta name="twitter:description" content="Crea la tua lega privata, scegli 20 giocatori e sfida i tuoi amici per tutta la stagione. Gratis, con voti Sofascore live.">
   <meta name="twitter:image" content="https://fanta-seriea.it/logo.png">
+
+  <!-- Structured Data (Google Rich Results) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Fanta Serie A 2025/26",
+    "url": "https://fanta-seriea.it",
+    "description": "Fantacalcio gratuito della Serie A italiana. Crea la tua lega privata con gli amici, scegli 20 giocatori e segui le classifiche live con i voti Sofascore.",
+    "applicationCategory": "SportsApplication",
+    "operatingSystem": "All",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "inLanguage": "it",
+    "image": "https://fanta-seriea.it/logo.png"
+  }
+  </script>
   <link rel="stylesheet" href="style.css">
   <link
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap"
@@ -252,14 +273,14 @@
       <section id="page-classifica" class="page">
         <div class="page-header">
           <h1><span class="material-symbols-outlined header-icon">emoji_events</span> Classifica</h1>
-          <p class="subtitle">Serie A 2025/26 – Aggiornamento live</p>
+          <p class="subtitle" id="classificaSubtitle">Serie A 2025/26 – Aggiornamento live</p>
         </div>
         <div class="hero-banner">
           <div class="hero-trophy"><span class="material-symbols-outlined"
               style="font-size:80px;color:#FCD34D;">emoji_events</span></div>
           <div class="hero-text">
             <h2>Serie A 2025/26</h2>
-            <p>20 squadre &nbsp;·&nbsp; 38 giornate &nbsp;·&nbsp; 1 giocatore per squadra</p>
+            <p id="classificaLegaNome">Serie A 2025/26 &nbsp;·&nbsp; 20 squadre &nbsp;·&nbsp; 38 giornate</p>
           </div>
         </div>
         <div class="classifica-table-wrap">

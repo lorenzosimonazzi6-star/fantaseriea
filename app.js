@@ -323,6 +323,19 @@ function renderClassifica() {
   const tbody = document.getElementById("classificaTbody");
   const gId   = document.getElementById("giornataSelectGiornata")?.value || "1";
   renderGrafico();
+
+  // Aggiorna nome lega dinamicamente
+  const nomeLega = currentLegaMeta?.nome || null;
+  const subtitle = document.getElementById("classificaSubtitle");
+  const legaNome = document.getElementById("classificaLegaNome");
+  if (nomeLega) {
+    if (subtitle) subtitle.textContent = `Classifica della lega "${nomeLega}"`;
+    if (legaNome) legaNome.textContent = nomeLega;
+  } else {
+    if (subtitle) subtitle.textContent = "Serie A 2025/26 – Aggiornamento live";
+    if (legaNome) legaNome.textContent = "Serie A 2025/26 · 20 squadre · 38 giornate";
+  }
+
   if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="icon">🏆</div><p>Nessun partecipante. Aggiungili in Admin.</p></div></td></tr>`;
     return;
@@ -3206,7 +3219,7 @@ function _renderGiocTabellone() {
 // ── LA MIA SQUADRA ───────────────────────────────────────────
 const ROSA_REQUISITI = { P:3, D:6, C:6, A:5 };
 const ROSA_TOTALE    = 20; // 3+6+6+5
-const DEADLINE_ISO   = "2025-08-24T11:00:00Z"; // 24 agosto 2025 ore 13:00 CEST (1h prima del calcio d'inizio G1)
+const DEADLINE_ISO   = "2025-01-01T00:00:00Z"; // Nessuna deadline — modifica sempre abilitata
 
 function isDeadlinePassata() {
   return Date.now() >= new Date(DEADLINE_ISO).getTime();
