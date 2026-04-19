@@ -3219,10 +3219,10 @@ function _renderGiocTabellone() {
 // ── LA MIA SQUADRA ───────────────────────────────────────────
 const ROSA_REQUISITI = { P:3, D:6, C:6, A:5 };
 const ROSA_TOTALE    = 20; // 3+6+6+5
-const DEADLINE_ISO   = "2025-01-01T00:00:00Z"; // Nessuna deadline — modifica sempre abilitata
+const DEADLINE_ISO   = "2099-01-01T00:00:00Z"; // Nessuna deadline — modifica sempre abilitata
 
 function isDeadlinePassata() {
-  return Date.now() >= new Date(DEADLINE_ISO).getTime();
+  return false; // deadline disabilitata — squadra sempre modificabile
 }
 
 // Stato locale del costruttore (non salvato finché non si preme Salva)
