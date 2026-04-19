@@ -162,9 +162,12 @@ function fetchRapidAPI(path) {
 function parseCardsFromIncidents(incidents) {
   const cards = {};
   const penaltyScored = {};
-  for (const inc of (incidents.incidents || [])) {
+  const incList = incidents.incidents || [];
+  console.log(`[poller] incidents totali: ${incList.length}`);
+  for (const inc of incList) {
     if (inc.incidentType === "card" && inc.player) {
       const name = inc.player.name;
+      console.log(`[poller] cartellino: ${name} → ${inc.incidentClass}`);
       if (!cards[name]) cards[name] = { amm: false, esp: false };
       if (inc.incidentClass === "yellow") {
         cards[name].amm = true;
@@ -189,7 +192,9 @@ function extractFlags(stats, ruolo, goalsAgainst, goalsAgainstPenalty, cardInfo)
     const faced  = stats?.penaltyFaced || 0;
     const rigPar = Math.max(0, faced - (goalsAgainstPenalty || 0));
     if (rigPar > 0) flags.rigpar = rigPar;
-    if ((stats?.minutesPlayed || 0) >= 90 && goalsAgainst === 0) flags.pi = 1;
+    // Porta inviolata: il portiere ha giocato (ha un rating o >= 60 minuti) e non ha subito gol
+    const hasPlayed = (stats?.rating) || (stats?.minutesPlayed || 0) >= 60;
+    if (hasPlayed && goalsAgainst === 0) flags.pi = 1;
     if (goalsAgainst > 0) flags.gs = goalsAgainst;
   }
   if (cardInfo?.amm) flags.amm = true;
@@ -229,6 +234,9 @@ async function parseLineups(lineups, incidents, match) {
       const rating = stats?.rating ? Math.round(parseFloat(stats.rating) * 10) / 10 : null;
       const sv     = entry.substitute === true && !(stats?.minutesPlayed > 0);
       const flags  = extractFlags(stats, ruolo, goalsAgainst, penaltyAgainst, cards[p.name]);
+      if (Object.keys(flags).length > 0) {
+        console.log(`[poller] flags ${p.name} (${ruolo}): ${JSON.stringify(flags)}`);
+      }
 
       if (sv) {
         result[squadra][p.name] = { sv: true, flags, source: "sofascore" };
