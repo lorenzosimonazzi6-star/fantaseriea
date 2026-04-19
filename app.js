@@ -1,5 +1,5 @@
 // ============================================================
-// FANTAMONDIALE 2026 — app.js
+// FANTA SERIE A 2025/26 — app.js
 // ============================================================
 
 const NAZIONALI = [
@@ -12,6 +12,33 @@ const NAZIONALI = [
 // Le squadre vengono mostrate in ordine alfabetico nella pagina Giocatori
 
 const RUOLI   = { P:"Portieri", D:"Difensori", C:"Centrocampisti", A:"Attaccanti" };
+
+// ── NORMALIZZAZIONE NOMI ─────────────────────────────────────
+// Rimuove accenti e caratteri speciali per matching robusto
+function normalizeName(s) {
+  if (!s) return "";
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+// Cerca un voto per nome giocatore con fallback:
+// 1. Match esatto
+// 2. Match normalizzato (ignora accenti)
+// 3. Match per cognome (il nome CSV è solo cognome, Sofascore usa nome+cognome)
+// 4. Match per cognome normalizzato
+function lookupVoto(votiSquadra, nomeCSV) {
+  if (!votiSquadra || !nomeCSV) return undefined;
+  // 1. Esatto
+  if (votiSquadra[nomeCSV] !== undefined) return votiSquadra[nomeCSV];
+  const normCSV = normalizeName(nomeCSV);
+  for (const [nomeFB, entry] of Object.entries(votiSquadra)) {
+    const normFB = normalizeName(nomeFB);
+    // 2. Match normalizzato (ignora accenti)
+    if (normFB === normCSV) return entry;
+    // 3. Il nome su Sofascore contiene il cognome del CSV (es. "Nikola Vlašić" contiene "Vlašić")
+    if (normFB.includes(normCSV) || normCSV.includes(normFB)) return entry;
+  }
+  return undefined;
+}
 
 const SUPERADMIN_PWD_HASH="b056fab42da260419217a7de0a31d107bd6fd385d5b3a03f9f168e7ec90d0d05";
 let superadminUnlocked=false;
@@ -161,13 +188,27 @@ function listenLega(legaId){
 function listenGlobal(){
   if(!window._fbReady||!window._db||fbGlobalListening)return;
   fbGlobalListening=true;
+
+  // Ascolta global/voti separatamente — aggiorna SEMPRE senza controllo _updatedAt
+  window._onVal(window._ref(window._db,"global/voti"),(snap)=>{
+    const d=snap.val();
+    if(!d)return;
+    globalState.voti = d;
+    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
+    renderPage(currentPage());
+    showSyncBar("🔄 Voti aggiornati",2000);
+  });
+
+  // Ascolta il resto di global/ (giornataCorrente, _updatedAt, ecc.)
   window._onVal(window._ref(window._db,"global"),(snap)=>{
     const d=snap.val();if(!d)return;
     if((d._updatedAt||0)<=(globalState._updatedAt||0))return;
-    // Preserva giocatoriSquadra — viene da global/giocatori, non da global/
-    const giocSalvati = globalState.giocatoriSquadra;
+    // Preserva giocatoriSquadra e voti — hanno listener dedicati
+    const giocSalvati  = globalState.giocatoriSquadra;
+    const votiSalvati  = globalState.voti;
     globalState=sanitizeGlobalState(d);
-    globalState.giocatoriSquadra = giocSalvati || globalState.giocatoriSquadra || {};
+    globalState.giocatoriSquadra = giocSalvati || {};
+    globalState.voti = votiSalvati || globalState.voti || {};
     localStorage.setItem("fsa_global",JSON.stringify(globalState));
     renderPage(currentPage());showSyncBar("🔄 Dati aggiornati",2000);
   });
@@ -330,7 +371,7 @@ function hasPendingVoti(partId, gId) {
   if (!rosa) return false;
   for (const [, arr] of Object.entries(rosa)) {
     for (const g of arr) {
-      const entry = globalState.voti[g.nazione]?.[gId]?.[g.nome];
+      const entry = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
       if (!entry) return true;
     }
   }
@@ -341,7 +382,7 @@ function countPendingVotiSquadra(naz, gId) {
   const players = getGiocatoriNazione(naz);
   let pending = 0;
   for (const g of players) {
-    const entry = globalState.voti[naz]?.[gId]?.[g.nome];
+    const entry = lookupVoto(globalState.voti[naz]?.[gId], g.nome);
     if (!entry) pending++;
   }
   return pending;
@@ -471,7 +512,7 @@ function buildGiornata() {
           <span class="ruolo-badge ruolo-${ruolo}" style="font-size:10px;padding:2px 6px">${ruolo}</span>
           <span style="margin-left:6px;font-weight:600">${RUOLI[ruolo]} · ${arr.length}</span></td></tr>`;
         const rows = arr.map(g => {
-          const entry  = globalState.voti[g.nazione]?.[gId]?.[g.nome];
+          const entry  = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
           const isCap  = cap === g.nome;
           const isSV   = entry?.sv;
           const v      = entry && !isSV ? parseFloat(entry.v)||0 : null;
@@ -500,7 +541,7 @@ function buildGiornata() {
 
           return `<tr${isSV?' class="sv"':""}>
             <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${g.nome}${capBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
-            <td style="font-size:12px;text-align:center">${isSV?'<span class="sv-text" style="font-size:11px">SV</span>':v!==null?`<span class="voto-num">${v.toFixed(1)}</span>`:pending?'<span style="color:var(--orange);font-size:11px;font-weight:700">?</span>':'<span class="voto-dash">–</span>'}</td>
+            <td style="font-size:12px;text-align:center">${isSV?'<span class="sv-text" style="font-size:11px">SV</span>':v!==null?`<span class="voto-num">${v.toFixed(1)}</span>`:'<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? mlsCell : '<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? bnsCell : '<span class="voto-dash">–</span>'}</td>
             <td style="text-align:center;padding-right:12px">${totV!==null?`<span class="tot-num${negCls}" style="font-size:15px">${totV.toFixed(1)}</span>`:'<span class="voto-dash">–</span>'}</td>
@@ -657,7 +698,7 @@ function renderVotiTable() {
   }
 
   const rows = giocatori.map(g => {
-    const entry = savedVoti[g.nome] || {};
+    const entry = lookupVoto(savedVoti, g.nome) || {};
     const isSV  = !!entry.sv;
     const v     = entry.v !== undefined ? entry.v : "";
     const flags = entry.flags || {};
@@ -3156,8 +3197,10 @@ function startApp() {
       const d=snap.val();
       if(d&&(d._updatedAt||0)>(globalState._updatedAt||0)){
         const giocSalvati = globalState.giocatoriSquadra;
+        const votiSalvati = globalState.voti;
         globalState=sanitizeGlobalState(d);
         globalState.giocatoriSquadra = giocSalvati || globalState.giocatoriSquadra || {};
+        globalState.voti = votiSalvati || globalState.voti || {};
         localStorage.setItem("fsa_global",JSON.stringify(globalState));
       }
       // Check URL for lega param
