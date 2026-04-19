@@ -74,8 +74,8 @@ const MATCHES = {
 };
 
 // In Serie A non ci sono supplementari → finestra fissa 120 min
-const FINESTRA_MS        = 120 * 60 * 1000; // 120 min dopo kickoff
-const POLLING_INTERVAL_MS = 15 * 60 * 1000; // polling ogni 15 min per partita
+const FINESTRA_MS         = 120 * 60 * 1000; // 120 min dopo kickoff
+const POLLING_INTERVAL_MS =   5 * 60 * 1000; // polling ogni 5 min (= cron interval)
 
 // ── FIREBASE ADMIN INIT ────────────────────────────────────
 let firebaseApp;
