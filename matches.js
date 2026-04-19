@@ -470,16 +470,16 @@ const MATCHES = {
 
   // ── GIORNATA 33 — 19/04/2026 ─────────────────────────────
   "33": [
-    { eventId: "", home: "Cremonese",  away: "Torino",      kickoff: "2026-04-19T13:30:00Z" },
-    { eventId: "", home: "Inter",      away: "Cagliari",    kickoff: "2026-04-19T13:30:00Z" },
-    { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-19T13:30:00Z" },
-    { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-19T13:30:00Z" },
-    { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-19T17:00:00Z" },
-    { eventId: "", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-19T17:00:00Z" },
-    { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-19T17:00:00Z" },
-    { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-19T17:00:00Z" },
-    { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-19T19:45:00Z" },
-    { eventId: "", home: "Verona",     away: "Milan",       kickoff: "2026-04-19T19:45:00Z" },
+    { eventId: "13981743", home: "Cremonese",  away: "Torino",      kickoff: "2026-04-19T12:30:00Z" },
+    { eventId: "", home: "Inter",      away: "Cagliari",    kickoff: "2026-04-18T13:30:00Z" },
+    { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-18T13:30:00Z" },
+    { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-18T13:30:00Z" },
+    { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-18T17:00:00Z" },
+    { eventId: "", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-18T17:00:00Z" },
+    { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-18T17:00:00Z" },
+    { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-18T17:00:00Z" },
+    { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-18T19:45:00Z" },
+    { eventId: "", home: "Verona",     away: "Milan",       kickoff: "2026-04-18T19:45:00Z" },
   ],
 
   // ── GIORNATA 34 — 24-27/04/2026 ──────────────────────────
