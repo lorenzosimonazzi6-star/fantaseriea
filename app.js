@@ -20,24 +20,46 @@ function normalizeName(s) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-// Cerca un voto per nome giocatore con fallback:
+// Estrae i token significativi da un nome (rimuove iniziali tipo "C." "F.")
+function nameTokens(s) {
+  return normalizeName(s)
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !t.endsWith(".")); // scarta iniziali "C." "F."
+}
+
+// Cerca un voto per nome giocatore con fallback multiplo:
 // 1. Match esatto
 // 2. Match normalizzato (ignora accenti)
-// 3. Match per cognome (il nome CSV è solo cognome, Sofascore usa nome+cognome)
-// 4. Match per cognome normalizzato
+// 3. Match per token — almeno un token significativo in comune
+//    Es: "Adams C." → tokens ["adams"] → trova "Che Adams" → tokens ["che","adams"] → match
+//    Es: "Bonazzoli" → trova "Federico Bonazzoli" → match
 function lookupVoto(votiSquadra, nomeCSV) {
   if (!votiSquadra || !nomeCSV) return undefined;
   // 1. Esatto
   if (votiSquadra[nomeCSV] !== undefined) return votiSquadra[nomeCSV];
-  const normCSV = normalizeName(nomeCSV);
+  const normCSV  = normalizeName(nomeCSV);
+  const tokensCSV = nameTokens(nomeCSV);
+
+  let bestMatch = undefined;
+  let bestScore = 0;
+
   for (const [nomeFB, entry] of Object.entries(votiSquadra)) {
-    const normFB = normalizeName(nomeFB);
-    // 2. Match normalizzato (ignora accenti)
+    const normFB    = normalizeName(nomeFB);
+    // 2. Match normalizzato esatto
     if (normFB === normCSV) return entry;
-    // 3. Il nome su Sofascore contiene il cognome del CSV (es. "Nikola Vlašić" contiene "Vlašić")
-    if (normFB.includes(normCSV) || normCSV.includes(normFB)) return entry;
+
+    // 3. Match per token
+    const tokensFB = nameTokens(nomeFB);
+    const comuni   = tokensCSV.filter(t => tokensFB.includes(t));
+    if (comuni.length > 0) {
+      // Punteggio: quanti token in comune / quanti token totali
+      const score = comuni.length / Math.max(tokensCSV.length, tokensFB.length);
+      if (score > bestScore) { bestScore = score; bestMatch = entry; }
+    }
   }
-  return undefined;
+
+  // Restituisce il match migliore se almeno un token significativo combacia
+  return bestScore > 0 ? bestMatch : undefined;
 }
 
 const SUPERADMIN_PWD_HASH="b056fab42da260419217a7de0a31d107bd6fd385d5b3a03f9f168e7ec90d0d05";
@@ -333,7 +355,7 @@ function calcolaTotGiocatore(nomeGioc, ruolo, nazione, partId, soloGiornata) {
   const part = partId ? state.partecipanti.find(p => p.id === partId) : null;
   const isCap = !!(part && part.capitanoGiocatore === nomeGioc);
   for (const gVoti of Object.values(gMap)) {
-    const entry = gVoti[nomeGioc];
+    const entry = lookupVoto(gVoti, nomeGioc);
     if (entry === undefined) continue;
     const v = calcVotoGiornata(entry, ruolo, isCap);
     if (v !== null) tot += v;
