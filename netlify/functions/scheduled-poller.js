@@ -33,7 +33,7 @@ const MATCHES = {
     { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-18T11:30:00Z" },
     { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-18T11:30:00Z" },
     { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-18T15:00:00Z" },
-    { eventId: "", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-18T15:00:00Z" },
+    { eventId: "13980100", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-19T16:00:00Z" },
     { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-18T15:00:00Z" },
     { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-18T15:00:00Z" },
     { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-18T17:45:00Z" },
@@ -185,21 +185,39 @@ function parseCardsFromIncidents(incidents) {
 
 function extractFlags(stats, ruolo, goalsAgainst, goalsAgainstPenalty, cardInfo) {
   const flags = {};
-  if ((stats?.goals    || 0) > 0) flags.gol    = stats.goals;
+
+  // Gol — Sofascore può usare "goals" o "goalNormal"
+  const gol = (stats?.goals || 0) + (stats?.goalNormal || 0);
+  if (gol > 0) flags.gol = gol;
+
+  // Assist
   if ((stats?.goalAssist || 0) > 0) flags.assist = stats.goalAssist;
-  if ((stats?.ownGoals || 0) > 0) flags.aut    = stats.ownGoals;
+
+  // Autogol
+  if ((stats?.ownGoals || 0) > 0) flags.aut = stats.ownGoals;
+
+  // Rigore sbagliato
+  if ((stats?.penaltyMiss || 0) > 0) flags.rig = true;
+
+  // Cartellini (da incidents — più affidabili delle stats)
+  if (cardInfo?.amm) flags.amm = true;
+  if (cardInfo?.esp) flags.esp = true;
+
+  // Solo portiere
   if (ruolo === "P") {
+    // Rigore parato
     const faced  = stats?.penaltyFaced || 0;
     const rigPar = Math.max(0, faced - (goalsAgainstPenalty || 0));
     if (rigPar > 0) flags.rigpar = rigPar;
-    // Porta inviolata: il portiere ha giocato (ha un rating o >= 60 minuti) e non ha subito gol
-    const hasPlayed = (stats?.rating) || (stats?.minutesPlayed || 0) >= 60;
+
+    // Porta inviolata: ha giocato e non ha subito gol
+    const hasPlayed = !!(stats?.rating) || (stats?.minutesPlayed || 0) >= 60;
     if (hasPlayed && goalsAgainst === 0) flags.pi = 1;
+
+    // Gol subiti
     if (goalsAgainst > 0) flags.gs = goalsAgainst;
   }
-  if (cardInfo?.amm) flags.amm = true;
-  if (cardInfo?.esp) flags.esp = true;
-  if ((stats?.penaltyMiss || 0) > 0) flags.rig = true;
+
   return flags;
 }
 
@@ -226,6 +244,12 @@ async function parseLineups(lineups, incidents, match) {
     const goalsAgainst   = side === "home" ? goalsAway  : goalsHome;
     const penaltyAgainst = side === "home" ? penaltyAgainstHome : penaltyAgainstAway;
     const players = lineups[side]?.players || [];
+    console.log(`[poller] ${squadra} — goals against: ${goalsAgainst}, players: ${players.length}`);
+
+    // Log stats del primo giocatore per vedere i campi disponibili
+    if (players[0]) {
+      console.log(`[poller] sample stats ${players[0].player.name}: ${JSON.stringify(players[0].statistics)}`);
+    }
 
     for (const entry of players) {
       const p      = entry.player;

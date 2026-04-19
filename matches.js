@@ -476,7 +476,7 @@ const MATCHES = {
     { eventId: "", home: "Juventus",   away: "Bologna",     kickoff: "2026-04-18T11:30:00Z" }, // sab 18/04 ore 13.30 CEST
     { eventId: "", home: "Lecce",      away: "Fiorentina",  kickoff: "2026-04-18T11:30:00Z" }, // sab 18/04 ore 13.30 CEST
     { eventId: "", home: "Napoli",     away: "Lazio",       kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
-    { eventId: "13980100", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
+    { eventId: "13980100", home: "Pisa",       away: "Genoa",       kickoff: "2026-04-19T16:00:00Z" }, // sab 18/04 ore 17.00 CEST
     { eventId: "", home: "Roma",       away: "Atalanta",    kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
     { eventId: "", home: "Sassuolo",   away: "Como",        kickoff: "2026-04-18T15:00:00Z" }, // sab 18/04 ore 17.00 CEST
     { eventId: "", home: "Udinese",    away: "Parma",       kickoff: "2026-04-18T17:45:00Z" }, // sab 18/04 ore 19.45 CEST
