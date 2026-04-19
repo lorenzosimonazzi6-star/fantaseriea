@@ -205,9 +205,9 @@ function extractFlags(stats, ruolo, goalsAgainst, goalsAgainstPenalty, cardInfo)
 
   // Solo portiere che ha effettivamente giocato
   if (ruolo === "P") {
+    // Solo portiere che ha effettivamente giocato (minutesPlayed > 0)
     const minPlayed = stats?.minutesPlayed || 0;
-    const hasRating = !!(stats?.rating);
-    const hasPlayed = hasRating || minPlayed >= 30; // ha giocato almeno 30 min
+    const hasPlayed = minPlayed > 0;
 
     if (hasPlayed) {
       // Rigore parato
@@ -279,21 +279,21 @@ async function writeVoti(db, giornata, votiNuovi) {
   const writes = [];
   for (const [squadra, giocatori] of Object.entries(votiNuovi)) {
     for (const [nome, dati] of Object.entries(giocatori)) {
-      const ref  = db.ref(`global/voti/${squadra}/${giornata}/${nome}`);
+      const ref = db.ref(`global/voti/${squadra}/${giornata}/${nome}`);
       const snap = await ref.once("value");
       const existing = snap.val() || {};
-      // Preserva eventuali modifiche manuali ai flags del superadmin
-      const existingFlags = existing.flags || {};
-      const hasManualEdits = existing.source === "sofascore" &&
-        JSON.stringify(existingFlags) !== JSON.stringify(dati.flags || {});
+      // Preserva flags solo se modificati manualmente dal superadmin
+      // (source !== "sofascore" significa che il superadmin ha modificato)
+      const useExistingFlags = existing.flags &&
+        Object.keys(existing.flags).length > 0 &&
+        existing.source !== "sofascore";
       writes.push(ref.set({
         ...dati,
-        flags: hasManualEdits ? existingFlags : (dati.flags || {}),
+        flags: useExistingFlags ? existing.flags : (dati.flags || {}),
       }));
     }
   }
   await Promise.all(writes);
-  // Aggiorna _updatedAt così listenGlobal() nel client riceve l'update
   await db.ref("global/_updatedAt").set(Date.now());
 }
 
