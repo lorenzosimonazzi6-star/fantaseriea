@@ -1,75 +1,38 @@
-// ============================================================
-// FANTA SERIE A 2025/26 — app.js
+﻿// ============================================================
+// FANTASY ARENA — app.js
 // ============================================================
 
-const NAZIONALI = [
-  "Atalanta","Bologna","Cagliari","Como","Cremonese",
-  "Fiorentina","Genoa","Inter","Juventus","Lazio",
-  "Lecce","Milan","Napoli","Parma","Pisa",
-  "Roma","Sassuolo","Torino","Udinese","Verona"
-].sort();
-
-// Le squadre vengono mostrate in ordine alfabetico nella pagina Giocatori
+// Lista 20 club Serie A 2026/27 (Monza, Venezia, Frosinone neopromosse)
+const SQUADRE = [
+  "Atalanta", "Bologna", "Cagliari", "Como", "Fiorentina",
+  "Frosinone", "Genoa", "Inter", "Juventus", "Lazio",
+  "Lecce", "Milan", "Monza", "Napoli", "Parma",
+  "Roma", "Sassuolo", "Torino", "Udinese", "Venezia",
+];
+const NAZIONALI = SQUADRE; // legacy alias
 
 const RUOLI   = { P:"Portieri", D:"Difensori", C:"Centrocampisti", A:"Attaccanti" };
 
-// ── NORMALIZZAZIONE NOMI ─────────────────────────────────────
-// Rimuove accenti e caratteri speciali per matching robusto
-function normalizeName(s) {
-  if (!s) return "";
-  return s
-    // Caratteri nordici e speciali non coperti da NFD
-    .replace(/Ø/g, "O").replace(/ø/g, "o")
-    .replace(/Æ/g, "AE").replace(/æ/g, "ae")
-    .replace(/Þ/g, "TH").replace(/þ/g, "th")
-    .replace(/Ð/g, "D").replace(/ð/g, "d")
-    .replace(/Ł/g, "L").replace(/ł/g, "l")
-    .replace(/ß/g, "ss")
-    // Normalizzazione NFD standard (accenti)
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().trim();
-}
+// Alias nomi club: normalizza varianti CSV/SofaScore → nome canonico
+// (da popolare quando si abbinano i nomi SofaScore, es. "AC Milan" → "Milan")
+const CLUB_ALIASES = {};
+function normalizeClub(n) { return CLUB_ALIASES[n] || n; }
+const NAZIONE_ALIASES = CLUB_ALIASES;
+function normalizeNazione(n) { return normalizeClub(n); }
 
-// Estrae i token significativi da un nome (rimuove iniziali tipo "C." "F.")
-function nameTokens(s) {
-  return normalizeName(s)
-    .split(/\s+/)
-    .filter(t => t.length > 1 && !t.endsWith(".")); // scarta iniziali "C." "F."
-}
-
-// Cerca un voto per nome giocatore con fallback multiplo:
-// 1. Match esatto
-// 2. Match normalizzato (ignora accenti)
-// 3. Match per token — almeno un token significativo in comune
-//    Es: "Adams C." → tokens ["adams"] → trova "Che Adams" → tokens ["che","adams"] → match
-//    Es: "Bonazzoli" → trova "Federico Bonazzoli" → match
-function lookupVoto(votiSquadra, nomeCSV) {
-  if (!votiSquadra || !nomeCSV) return undefined;
-  // 1. Esatto
-  if (votiSquadra[nomeCSV] !== undefined) return votiSquadra[nomeCSV];
-  const normCSV  = normalizeName(nomeCSV);
-  const tokensCSV = nameTokens(nomeCSV);
-
-  let bestMatch = undefined;
-  let bestScore = 0;
-
-  for (const [nomeFB, entry] of Object.entries(votiSquadra)) {
-    const normFB    = normalizeName(nomeFB);
-    // 2. Match normalizzato esatto
-    if (normFB === normCSV) return entry;
-
-    // 3. Match per token
-    const tokensFB = nameTokens(nomeFB);
-    const comuni   = tokensCSV.filter(t => tokensFB.includes(t));
-    if (comuni.length > 0) {
-      // Punteggio: quanti token in comune / quanti token totali
-      const score = comuni.length / Math.max(tokensCSV.length, tokensFB.length);
-      if (score > bestScore) { bestScore = score; bestMatch = entry; }
+// Normalizza chiavi giocatoriSquadra in-memory (fix alias senza riscrivere Firebase)
+function normalizeGiocatoriSquadra(obj) {
+  if (!obj) return obj;
+  for (const [alias, canonical] of Object.entries(NAZIONE_ALIASES)) {
+    if (obj[alias]) {
+      if (!obj[canonical]) obj[canonical] = [];
+      for (const g of obj[alias]) {
+        if (!obj[canonical].some(x => x.nome === g.nome)) obj[canonical].push(g);
+      }
+      delete obj[alias];
     }
   }
-
-  // Restituisce il match migliore se almeno un token significativo combacia
-  return bestScore > 0 ? bestMatch : undefined;
+  return obj;
 }
 
 const SUPERADMIN_PWD_HASH="b056fab42da260419217a7de0a31d107bd6fd385d5b3a03f9f168e7ec90d0d05";
@@ -77,16 +40,11 @@ let superadminUnlocked=false;
 let currentLegaId=null;
 let currentLegaMeta=null;
 let currentUser=null; // Firebase Auth user
-const GIORNATE = {
-  1:"G1",  2:"G2",  3:"G3",  4:"G4",  5:"G5",
-  6:"G6",  7:"G7",  8:"G8",  9:"G9",  10:"G10",
-  11:"G11",12:"G12",13:"G13",14:"G14",15:"G15",
-  16:"G16",17:"G17",18:"G18",19:"G19",20:"G20",
-  21:"G21",22:"G22",23:"G23",24:"G24",25:"G25",
-  26:"G26",27:"G27",28:"G28",29:"G29",30:"G30",
-  31:"G31",32:"G32",33:"G33",34:"G34",35:"G35",
-  36:"G36",37:"G37",38:"G38"
-};
+// Serie A: 38 giornate di campionato (nessun knockout). Etichette = numero giornata.
+const GIORNATE_FALLBACK = Object.fromEntries(Array.from({ length: 38 }, (_, i) => [i + 1, "G" + (i + 1)]));
+const GIORNATE = new Proxy({}, { get: (_,id) => { const k="giornate."+id, tv=(typeof t==="function")?t(k):null; return (tv && tv!==k) ? tv : (GIORNATE_FALLBACK[id] || "G"+id); } });
+// Opzioni <option> per i menu giornata (38 giornate Serie A)
+function giornateOptions(){ return Array.from({length:38},(_,i)=>`<option value="${i+1}">Giornata ${i+1}</option>`).join(""); }
 
 // ── REGOLAMENTO BONUS/MALUS ──────────────────────────────────
 // votoBase + bonus_calcolati - malus_calcolati = totale
@@ -119,15 +77,17 @@ function getFlagsForRuolo(ruolo) {
 
 // ── STATE ────────────────────────────────────────────────────
 function defaultLegaState(){return{partecipanti:[],rose:{},giocatoriSquadra:{},sostituzioni:{},pwdHash:null,_updatedAt:0};}
-function defaultGlobalState(){return{voti:{},giornataCorrente:"1",giocatoriSquadra:{},_updatedAt:0};}
+function defaultGlobalState(){return{voti:{},giornataCorrente:"1",giocatoriSquadra:{},clubEliminati:{},_updatedAt:0};}
 function defaultState(){return defaultLegaState();}
 
 // Garantisce che lo state abbia sempre tutti i campi necessari (es. dopo sync Firebase)
 function sanitizeLegaState(s){
   if(!s)return defaultLegaState();
   if(!Array.isArray(s.partecipanti))s.partecipanti=[];
+  s.partecipanti = s.partecipanti.filter(Boolean); // rimuove null da buchi array Firebase
   if(!s.rose||typeof s.rose!="object")s.rose={};
   if(!s.giocatoriSquadra||typeof s.giocatoriSquadra!="object")s.giocatoriSquadra={};
+  normalizeGiocatoriSquadra(s.giocatoriSquadra); // fix alias nomi (es. Congo → RD Congo)
   if(!s.sostituzioni||typeof s.sostituzioni!="object")s.sostituzioni={};
   if(!s.pwdHash)s.pwdHash=null;
   if(!s._updatedAt)s._updatedAt=0;
@@ -138,13 +98,36 @@ function sanitizeGlobalState(s){
   if(!s.voti||typeof s.voti!="object")s.voti={};
   if(!s.giornataCorrente)s.giornataCorrente="1";
   if(!s.giocatoriSquadra||typeof s.giocatoriSquadra!="object")s.giocatoriSquadra={};
+  normalizeGiocatoriSquadra(s.giocatoriSquadra); // fix alias nomi (es. Congo → RD Congo)
+  // Accetta sia il vecchio formato array sia il nuovo oggetto { club: giornataElim }
+  if (Array.isArray(s.clubEliminati)) {
+    const migrated = {};
+    for (const club of s.clubEliminati) migrated[club] = "8";
+    s.clubEliminati = migrated;
+  } else if (typeof s.clubEliminati !== "object" || s.clubEliminati === null) {
+    s.clubEliminati = {};
+  }
   if(!s._updatedAt)s._updatedAt=0;
   return s;
 }
+
+// forGiornata: se passato, la nazione è "eliminata" solo nelle giornate successive a quella di eliminazione.
+// Se omesso, restituisce true se la nazione è comunque segnata come eliminata (utile per banner globali).
+function isClubEliminato(club, forGiornata) {
+  const elim = globalState.clubEliminati;
+  if (!elim) return false;
+  if (Array.isArray(elim)) return elim.includes(club); // legacy
+  if (typeof elim !== "object") return false;
+  if (!(club in elim)) return false;
+  if (forGiornata === undefined || forGiornata === null) return true;
+  return Number(forGiornata) > Number(elim[club]);
+}
+// alias retrocompatibilità
+function isNazioneEliminata(naz, forGiornata) { return isClubEliminato(naz, forGiornata); }
 function sanitizeState(s){return sanitizeLegaState(s);}
 
-function loadLegaState(id){try{const r=localStorage.getItem("fsa_lega_"+id);if(r)return sanitizeLegaState(JSON.parse(r));}catch(e){}return defaultLegaState();}
-function loadGlobalState(){try{const r=localStorage.getItem("fsa_global");if(r)return sanitizeGlobalState(JSON.parse(r));}catch(e){}return defaultGlobalState();}
+function loadLegaState(id){try{const r=localStorage.getItem("ucl_lega_"+id);if(r)return sanitizeLegaState(JSON.parse(r));}catch(e){}return defaultLegaState();}
+function loadGlobalState(){try{const r=localStorage.getItem("ucl_global");if(r)return sanitizeGlobalState(JSON.parse(r));}catch(e){}return defaultGlobalState();}
 function loadState(){return defaultLegaState();}
 
 let state=defaultLegaState();
@@ -155,13 +138,13 @@ let sortBy="totale";
 
 function saveState(){
   state._updatedAt=Date.now();
-  if(currentLegaId){try{localStorage.setItem("fsa_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}syncLegaToFirebase();}
+  if(currentLegaId){try{localStorage.setItem("ucl_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}syncLegaToFirebase();}
 }
 function saveGlobalState(){
   globalState._updatedAt=Date.now();
-  try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}syncGlobalToFirebase();
+  try{localStorage.setItem("ucl_global",JSON.stringify(globalState));}catch(e){}syncGlobalToFirebase();
 }
-function saveLocalOnly(){if(currentLegaId)try{localStorage.setItem("fsa_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}}
+function saveLocalOnly(){if(currentLegaId)try{localStorage.setItem("ucl_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}}
 
 // ── HASH ─────────────────────────────────────────────────────
 async function sha256(str) {
@@ -170,86 +153,103 @@ async function sha256(str) {
 }
 
 
-// ── FIREBASE SYNC ────────────────────────────────────────────
+// ── FIREBASE SYNC con debounce (evita write multipli ravvicinati) ──
+// Se l'admin modifica più voti in rapida successione, aspettiamo
+// 800ms dall'ultima modifica prima di scrivere su Firebase.
+let _fbSyncLegaTimer = null;
+let _fbSyncGlobalTimer = null;
+
 function syncLegaToFirebase(){
   if(!window._fbReady||!window._db||!currentLegaId)return;
-  try{window._set(window._ref(window._db,"leghe/"+currentLegaId+"/state"),state).catch(e=>console.warn("FB:",e));}catch(e){}
+  clearTimeout(_fbSyncLegaTimer);
+  _fbSyncLegaTimer = setTimeout(()=>{
+    try{window._set(window._ref(window._db,"leghe/"+currentLegaId+"/state"),state).catch(e=>console.warn("FB:",e));}catch(e){}
+  }, 800);
 }
 function syncGlobalToFirebase(){
   if(!window._fbReady||!window._db)return;
-  // Salva tutto global TRANNE giocatoriSquadra (ha il suo path dedicato)
-  const toSave = {...globalState};
-  delete toSave.giocatoriSquadra;
-  try{window._set(window._ref(window._db,"global"),toSave).catch(e=>console.warn("FB:",e));}catch(e){}
-}
-
-// Salva i giocatori in global/giocatori — path dedicato, condiviso tra tutte le leghe
-function saveGiocatoriToFirebase(db){
-  if(!window._fbReady||!window._db)return;
-  try{
-    window._set(window._ref(window._db,"global/giocatori"), globalState.giocatoriSquadra||{})
-      .catch(e=>console.warn("FB giocatori:",e));
-  }catch(e){}
-}
-
-// Ascolta global/giocatori all'avvio — indipendente dalla lega
-let fbGiocatoriListening=false;
-function listenGiocatori(){
-  if(!window._fbReady||!window._db||fbGiocatoriListening)return;
-  fbGiocatoriListening=true;
-  window._onVal(window._ref(window._db,"global/giocatori"),(snap)=>{
-    const d=snap.val();
-    if(!d)return;
-    globalState.giocatoriSquadra=d;
-    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
-    if(currentPage()==="giocatori")renderGiocatoriPage();
-  });
+  clearTimeout(_fbSyncGlobalTimer);
+  _fbSyncGlobalTimer = setTimeout(()=>{
+    try{window._set(window._ref(window._db,"global"),globalState).catch(e=>console.warn("FB:",e));}catch(e){}
+  }, 800);
 }
 function syncToFirebase(){syncLegaToFirebase();}
 
-let fbGlobalListening=false;
+// ── FIREBASE LISTENERS con Page Visibility API ────────────────
+// Manteniamo gli unsubscribe per poter staccare i listener
+// quando la tab va in background e riconnetterli al ritorno.
+// Questo riduce le connessioni simultanee su Firebase (~50% in meno).
+let _fbUnsubGlobal = null;
+let _fbUnsubLega   = null;
+let fbGlobalListening = false;
+
 function listenLega(legaId){
   if(!window._fbReady||!window._db)return;
-  window._onVal(window._ref(window._db,"leghe/"+legaId+"/state"),(snap)=>{
+  if(_fbUnsubLega){ _fbUnsubLega(); _fbUnsubLega=null; }
+  _fbUnsubLega = window._onVal(window._ref(window._db,"leghe/"+legaId+"/state"),(snap)=>{
     const d=snap.val();if(!d)return;
-    if((d._updatedAt||0)<=(state._updatedAt||0))return;
-    state=sanitizeLegaState(d);saveLocalOnly();renderPage(currentPage());
+    const roseVuote = !state.rose || Object.keys(state.rose).length === 0;
+    if((d._updatedAt||0)<=(state._updatedAt||0) && !roseVuote)return;
+    state=sanitizeLegaState(d);
+    mergePlayerRoseIntoState(); // riapplica iscrizioni/rose self-service
+    saveLocalOnly();renderPage(currentPage());
     showSyncBar("🔄 Lega aggiornata",2000);
   });
 }
 function listenGlobal(){
-  if(!window._fbReady||!window._db||fbGlobalListening)return;
+  if(!window._fbReady||!window._db)return;
+  if(_fbUnsubGlobal){ _fbUnsubGlobal(); _fbUnsubGlobal=null; fbGlobalListening=false; }
+  if(fbGlobalListening)return;
   fbGlobalListening=true;
-
-  // Ascolta global/voti separatamente — aggiorna SEMPRE senza controllo _updatedAt
-  window._onVal(window._ref(window._db,"global/voti"),(snap)=>{
-    const d=snap.val();
-    if(!d)return;
-    globalState.voti = d;
-    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
-    renderPage(currentPage());
-    showSyncBar("🔄 Voti aggiornati",2000);
-  });
-
-  // Ascolta il resto di global/ (giornataCorrente, _updatedAt, ecc.)
-  window._onVal(window._ref(window._db,"global"),(snap)=>{
+  _fbUnsubGlobal = window._onVal(window._ref(window._db,"global"),(snap)=>{
     const d=snap.val();if(!d)return;
     if((d._updatedAt||0)<=(globalState._updatedAt||0))return;
-    // Preserva giocatoriSquadra e voti — hanno listener dedicati
-    const giocSalvati  = globalState.giocatoriSquadra;
-    const votiSalvati  = globalState.voti;
     globalState=sanitizeGlobalState(d);
-    globalState.giocatoriSquadra = giocSalvati || {};
-    globalState.voti = votiSalvati || globalState.voti || {};
-    localStorage.setItem("fsa_global",JSON.stringify(globalState));
+    localStorage.setItem("ucl_global",JSON.stringify(globalState));
     renderPage(currentPage());showSyncBar("🔄 Dati aggiornati",2000);
   });
 }
-function listenFirebase(){listenGlobal();listenGiocatori();if(currentLegaId)listenLega(currentLegaId);}
+function listenFirebase(){
+  listenGlobal();
+  if(currentLegaId){
+    listenLega(currentLegaId);
+    subscribePlayerSostituzioni(currentLegaId);
+    subscribePlayerRose(currentLegaId);
+  }
+}
+
+// Pausa/riprendi listener al cambio visibilità tab
+function _fbDetachAll(){
+  if(_fbUnsubGlobal){_fbUnsubGlobal();_fbUnsubGlobal=null;fbGlobalListening=false;}
+  if(_fbUnsubLega){_fbUnsubLega();_fbUnsubLega=null;}
+  if(_playerSostUnsubscribe){_playerSostUnsubscribe();_playerSostUnsubscribe=null;}
+  if(_playerRoseUnsubscribe){_playerRoseUnsubscribe();_playerRoseUnsubscribe=null;}
+}
+function _fbReattach(){
+  // Rileggi da localStorage (cache locale) + riaggiancia i listener live
+  if(currentLegaId){
+    try{
+      const cached=localStorage.getItem("ucl_lega_"+currentLegaId);
+      if(cached){const d=JSON.parse(cached);if((d._updatedAt||0)>=(state._updatedAt||0))state=sanitizeLegaState(d);}
+    }catch(e){}
+  }
+  listenFirebase();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){
+    _fbDetachAll();
+  } else {
+    // Tab tornata in primo piano: riconnetti e aggiorna subito
+    _fbReattach();
+  }
+});
+// iOS Safari: pagehide/pageshow come fallback a visibilitychange
+window.addEventListener("pagehide", _fbDetachAll);
+window.addEventListener("pageshow", e => { if(e.persisted) _fbReattach(); });
 
 
 function saveLocalOnly() {
-  try { localStorage.setItem("fantaseriea_v1", JSON.stringify(state)); } catch(e){}
+  try { localStorage.setItem("ucl_state_v1", JSON.stringify(state)); } catch(e){}
 }
 
 let syncBarTimer;
@@ -277,6 +277,7 @@ function currentPage() { return _currentPage; }
 
 function navigate(page){
   _currentPage=page;
+  if(currentLegaId) localStorage.setItem("ucl_tab", page);
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
   const el=document.getElementById("page-"+page);
@@ -285,25 +286,92 @@ function navigate(page){
   const gC=globalState.giornataCorrente||"1";
   ["giornataSelectGiornata","selectGiornata"].forEach(id=>{const e=document.getElementById(id);if(e&&e.value!==gC)e.value=gC;});
   renderPage(page);
-  const menu=document.getElementById("mobileMenu");if(menu)menu.classList.remove("open");
+  closeMainDrawer();
+}
+
+function closeMainDrawer() {
+  document.getElementById("navLinks")?.classList.remove("open");
+  document.getElementById("drawerOverlay")?.classList.remove("open");
 }
 
 document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => navigate(btn.dataset.page));
 });
 document.getElementById("hamburger")?.addEventListener("click", () => {
-  document.getElementById("mobileMenu").classList.toggle("open");
+  document.getElementById("navLinks")?.classList.toggle("open");
+  document.getElementById("drawerOverlay")?.classList.toggle("open");
 });
+document.getElementById("drawerClose")?.addEventListener("click", closeMainDrawer);
+document.getElementById("drawerOverlay")?.addEventListener("click", closeMainDrawer);
 
 function renderPage(p){
-
+  if(p==="home")     { renderAnnounceBanner(); renderWinnerBanner(); }
   if(p==="classifica")renderClassifica();
+  if(p==="stats")    renderStats();
   if(p==="squadra")renderSquadraPage();
   if(p==="giocatori")renderGiocatoriPage();
   if(p==="giornata")renderGiornata();
   if(p==="voti")renderVotiPage();
   if(p==="admin")renderAdminPage();
   if(p==="superadmin")renderSuperadminPage();
+  if(p==="chat")renderChat();
+}
+
+// ── BANNER ANNUNCIO (sparisce dopo la deadline) ───────────────
+function renderAnnounceBanner() {
+  const el = document.getElementById("home-announce-banner");
+  if (!el) return;
+  // Dopo la deadline non ha più senso: nascondi definitivamente
+  if (isDeadlinePassata()) { el.style.display = "none"; }
+}
+
+// ── BANNER VINCITORE (appare dopo la finale) ──────────────────
+function renderWinnerBanner() {
+  const wrap = document.getElementById("home-winner-banner");
+  if (!wrap) return;
+
+  // Nascondi se: nessuna lega attiva, torneo non ancora concluso, o nessuna rosa
+  if (!currentLegaId || !isFinalePassata() || !state.partecipanti?.length) {
+    wrap.innerHTML = ""; return;
+  }
+
+  // Calcola classifica finale
+  const ranking = state.partecipanti
+    .map(p => ({ ...p, punti: calcolaPuntiRosa(p.id) }))
+    .sort((a, b) => b.punti - a.punti);
+
+  if (!ranking.length || ranking[0].punti === 0) { wrap.innerHTML = ""; return; }
+
+  const max = ranking[0].punti;
+  const vincitori = ranking.filter(p => p.punti === max);
+  const legaNome  = currentLegaMeta?.nome || "la tua lega";
+
+  // Top-3 podio (escluso chi è già nei vincitori se parità)
+  const podio = ranking.slice(0, Math.min(3, ranking.length));
+
+  const podioHtml = podio.map((p, i) => {
+    const medals = ["🥇","🥈","🥉"];
+    const isWinner = p.punti === max;
+    return `<div class="winner-podio-item${isWinner ? " winner-first" : ""}">
+      <span class="winner-medal">${medals[i]}</span>
+      <span class="winner-podio-name">${p.nome}</span>
+      <span class="winner-podio-pts">${p.punti.toFixed(1)} pt</span>
+    </div>`;
+  }).join("");
+
+  const titolo = vincitori.length > 1
+    ? vincitori.map(v => v.nome).join(" & ")
+    : vincitori[0].nome;
+
+  wrap.innerHTML = `
+    <div class="winner-banner">
+      <div class="winner-stars">★ ★ ★ ★ ★</div>
+      <div class="winner-trophy">🏆</div>
+      <h2 class="winner-title">${titolo}</h2>
+      <p class="winner-subtitle">Vincitore di <strong>${legaNome}</strong> · FIFA World Cup 2026</p>
+      <div class="winner-score">${max.toFixed(1)} punti</div>
+      <div class="winner-podio">${podioHtml}</div>
+    </div>`;
 }
 
 
@@ -356,8 +424,10 @@ function calcVotoGiornata(sv_entry, ruolo, isCap) {
   return Math.round(tot * 10) / 10;
 }
 
+function safeKey(s) { return String(s).replace(/[.#$[\]]/g, "_"); }
+
 function calcolaTotGiocatore(nomeGioc, ruolo, nazione, partId, soloGiornata) {
-  const votiNaz = globalState.voti[nazione] || {};
+  const votiNaz = globalState.voti[normalizeNazione(nazione || "")] || {};
   let tot = 0;
   const gMap = soloGiornata
     ? (votiNaz[soloGiornata] ? {[soloGiornata]: votiNaz[soloGiornata]} : {})
@@ -365,7 +435,8 @@ function calcolaTotGiocatore(nomeGioc, ruolo, nazione, partId, soloGiornata) {
   const part = partId ? state.partecipanti.find(p => p.id === partId) : null;
   const isCap = !!(part && part.capitanoGiocatore === nomeGioc);
   for (const gVoti of Object.values(gMap)) {
-    const entry = lookupVoto(gVoti, nomeGioc);
+    if (!gVoti || typeof gVoti !== "object") continue;
+    const entry = gVoti[safeKey(nomeGioc)];
     if (entry === undefined) continue;
     const v = calcVotoGiornata(entry, ruolo, isCap);
     if (v !== null) tot += v;
@@ -373,27 +444,45 @@ function calcolaTotGiocatore(nomeGioc, ruolo, nazione, partId, soloGiornata) {
   return Math.round(tot * 10) / 10;
 }
 
-function calcolaPuntiRosa(partId) {
-  const rosa = state.rose[partId];
+function calcolaPuntiGiornata(partId, gId) {
+  // Usa la rosa effettiva (con sostituzioni applicate) per la giornata specifica
+  const rosa = getEffectiveRosa(partId, gId) || state.rose[partId];
   if (!rosa) return 0;
   let tot = 0;
   for (const [ruolo, arr] of Object.entries(rosa)) {
+    if (!Array.isArray(arr)) continue;
     for (const g of arr) {
-      tot += calcolaTotGiocatore(g.nome, ruolo, g.nazione, partId, null);
+      if (!g?.nome) continue;
+      tot += calcolaTotGiocatore(g.nome, ruolo, g.nazione, partId, gId);
     }
   }
   return Math.round(tot * 10) / 10;
 }
 
-function calcolaPuntiGiornata(partId, gId) {
-  const rosa = state.rose[partId];
-  if (!rosa) return 0;
-  let tot = 0;
-  for (const [ruolo, arr] of Object.entries(rosa)) {
-    for (const g of arr) {
-      tot += calcolaTotGiocatore(g.nome, ruolo, g.nazione, partId, gId);
-    }
+function calcolaPuntiRosa(partId) {
+  // Somma calcolaPuntiGiornata per ogni giornata con voti presenti
+  // così le sostituzioni vengono applicate giornata per giornata
+  const votiNaz = globalState.voti || {};
+  const giornateConVoti = new Set();
+  for (const naz of Object.values(votiNaz)) {
+    for (const gId of Object.keys(naz)) giornateConVoti.add(gId);
   }
+  if (!giornateConVoti.size) {
+    // Fallback: rosa base senza giornate
+    const rosa = state.rose[partId];
+    if (!rosa) return 0;
+    let tot = 0;
+    for (const [ruolo, arr] of Object.entries(rosa)) {
+      if (!Array.isArray(arr)) continue;
+      for (const g of arr) {
+        if (!g?.nome) continue;
+        tot += calcolaTotGiocatore(g.nome, ruolo, g.nazione, partId, null);
+      }
+    }
+    return Math.round(tot * 10) / 10;
+  }
+  let tot = 0;
+  for (const gId of giornateConVoti) tot += calcolaPuntiGiornata(partId, gId);
   return Math.round(tot * 10) / 10;
 }
 
@@ -402,14 +491,11 @@ function hasPendingVoti(partId, gId) {
   const rosa = state.rose[partId];
   if (!rosa) return false;
   for (const [, arr] of Object.entries(rosa)) {
+    if (!Array.isArray(arr)) continue;
     for (const g of arr) {
-      const entry = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
-      if (!entry) {
-        // Se la squadra ha già voti per questa giornata → giocatore non convocato (SV auto), non è pending
-        const squadraHaVoti = globalState.voti[g.nazione]?.[gId] &&
-          Object.keys(globalState.voti[g.nazione][gId]).length > 0;
-        if (!squadraHaVoti) return true; // partita non ancora giocata → pending
-      }
+      if (!g?.nome) continue;
+      const entry = globalState.voti[g.nazione]?.[gId]?.[safeKey(g.nome)];
+      if (!entry) return true;
     }
   }
   return false;
@@ -419,7 +505,7 @@ function countPendingVotiSquadra(naz, gId) {
   const players = getGiocatoriNazione(naz);
   let pending = 0;
   for (const g of players) {
-    const entry = lookupVoto(globalState.voti[naz]?.[gId], g.nome);
+    const entry = globalState.voti[naz]?.[gId]?.[safeKey(g.nome)];
     if (!entry) pending++;
   }
   return pending;
@@ -430,21 +516,8 @@ function renderClassifica() {
   const tbody = document.getElementById("classificaTbody");
   const gId   = document.getElementById("giornataSelectGiornata")?.value || "1";
   renderGrafico();
-
-  // Aggiorna nome lega dinamicamente
-  const nomeLega = currentLegaMeta?.nome || null;
-  const subtitle = document.getElementById("classificaSubtitle");
-  const legaNome = document.getElementById("classificaLegaNome");
-  if (nomeLega) {
-    if (subtitle) subtitle.textContent = `Classifica della lega "${nomeLega}"`;
-    if (legaNome) legaNome.textContent = nomeLega;
-  } else {
-    if (subtitle) subtitle.textContent = "Serie A 2025/26 – Aggiornamento live";
-    if (legaNome) legaNome.textContent = "Serie A 2025/26 · 20 squadre · 38 giornate";
-  }
-
   if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="icon">🏆</div><p>Nessun partecipante. Aggiungili in Admin.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="icon">🏆</div><p>${t("classifica.empty")}</p></div></td></tr>`;
     return;
   }
   const rows = state.partecipanti.map(p => ({
@@ -494,6 +567,430 @@ document.querySelectorAll(".sortable").forEach(th => {
   });
 });
 
+// ── STATISTICHE LEGA ─────────────────────────────────────────
+function renderStats() {
+  const wrap = document.getElementById("stats-content");
+  if (!wrap) return;
+
+  if (!currentLegaId) {
+    wrap.innerHTML = `<p class="hint" style="text-align:center;padding:40px 0">Entra in una lega per vedere le statistiche.</p>`;
+    return;
+  }
+
+  // Assicura che i dati playerRose siano sempre mergiati nello state
+  // (necessario se il listener ha sparato mentre eravamo su un'altra pagina)
+  mergePlayerRoseIntoState();
+
+  const parts      = state.partecipanti || [];
+  const totalParts = parts.filter(p => !!state.rose[p.id]).length;
+
+  if (!totalParts) {
+    wrap.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text2)">
+      <span class="material-symbols-outlined" style="font-size:32px;display:block;margin-bottom:8px;animation:spin 1.2s linear infinite">sync</span>
+      <p style="margin:0;font-size:14px">Caricamento statistiche...</p>
+    </div>`;
+    // Retry after 2s in case playerRose data arrives after this render
+    setTimeout(() => { if (currentPage() === "stats") renderStats(); }, 2000);
+    return;
+  }
+
+  // ── Ownership map: chiave "nome||nazione" → { nome, ruolo, nazione, count, owners[] }
+  const ownership   = {};
+  const captainMap  = {};
+
+  for (const p of parts) {
+    const rosa = getEffectiveRosa(p.id, 999);
+    if (!rosa) continue;
+    for (const [ruolo, arr] of Object.entries(rosa)) {
+      if (!Array.isArray(arr)) continue;
+      for (const g of arr) {
+        if (!g?.nome) continue;
+        const naz = normalizeNazione(g.nazione || "");
+        const key = g.nome + "||" + naz;
+        if (!ownership[key]) ownership[key] = { nome: g.nome, ruolo, nazione: naz, count: 0, owners: [] };
+        ownership[key].count++;
+        ownership[key].owners.push(p.nome);
+      }
+    }
+    const cap = p.capitanoGiocatore;
+    if (cap) {
+      if (!captainMap[cap]) captainMap[cap] = { count: 0, owners: [] };
+      captainMap[cap].count++;
+      captainMap[cap].owners.push(p.nome);
+    }
+  }
+
+  const allPlayers  = Object.values(ownership).sort((a, b) => b.count - a.count);
+  const topPlayers  = allPlayers.slice(0, 10);
+  const topCaptains = Object.entries(captainMap).sort((a, b) => b[1].count - a[1].count);
+
+  // Scelte per nazione: per ogni nazione, quali giocatori sono stati scelti e da quanti
+  // Struttura: { nazione → { nomeGiocatore → count } }
+  const nazioneScelte = {};
+  for (const p of parts) {
+    const rosa = getEffectiveRosa(p.id, 999);
+    if (!rosa) continue;
+    for (const [, arr] of Object.entries(rosa)) {
+      if (!Array.isArray(arr)) continue;
+      for (const g of arr) {
+        if (!g?.nome) continue;
+        const naz = normalizeNazione(g.nazione || "");
+        if (!nazioneScelte[naz]) nazioneScelte[naz] = {};
+        nazioneScelte[naz][g.nome] = (nazioneScelte[naz][g.nome] || 0) + 1;
+      }
+    }
+  }
+  // Ordina: prima le nazioni con più disaccordo (più scelte diverse), poi per nazione
+  const nazioniOrdinate = Object.entries(nazioneScelte)
+    .map(([naz, picks]) => {
+      const sorted = Object.entries(picks).sort((a, b) => b[1] - a[1]);
+      const topCount = sorted[0]?.[1] || 0;
+      const unique   = sorted.length; // numero di giocatori diversi scelti
+      return { naz, picks: sorted, topCount, unique };
+    })
+    .sort((a, b) => b.unique - a.unique || a.naz.localeCompare(b.naz));
+
+  // ── Scoring stats ────────────────────────────────────────────
+  const hasVoti  = Object.keys(globalState.voti || {}).length > 0;
+  let topScorers = [], topCapScorers = [], svPerPart = [], bonusMalusPerPart = [];
+
+  if (hasVoti) {
+    // Giocatori più redditizi: punteggio base (senza bonus capitano)
+    topScorers = Object.values(ownership)
+      .map(g => ({ ...g, pts: calcolaTotGiocatore(g.nome, g.ruolo, g.nazione, null, null) }))
+      .filter(g => g.pts > 0)
+      .sort((a, b) => b.pts - a.pts)
+      .slice(0, 8);
+
+    // Rendimento capitani: deduplicati per nome, punteggio con bonus capitano
+    const _capMap = {};
+    parts
+      .filter(p => p.capitanoGiocatore && state.rose[p.id])
+      .forEach(p => {
+        const capNome = p.capitanoGiocatore;
+        let capRuolo = null, capNazione = null;
+        for (const [ruolo, arr] of Object.entries(state.rose[p.id] || {})) {
+          if (!Array.isArray(arr)) continue;
+          const found = arr.find(g => g.nome === capNome);
+          if (found) { capRuolo = ruolo; capNazione = found.nazione; break; }
+        }
+        const pts = capRuolo ? calcolaTotGiocatore(capNome, capRuolo, capNazione, p.id, null) : 0;
+        if (!_capMap[capNome]) _capMap[capNome] = { capNome, capNazione, capRuolo, pts, count: 0 };
+        _capMap[capNome].count++;
+        if (pts > _capMap[capNome].pts) _capMap[capNome].pts = pts;
+      });
+    topCapScorers = Object.values(_capMap).sort((a, b) => b.pts - a.pts);
+
+    // SV per partecipante
+    const giornateConVoti = new Set();
+    for (const naz of Object.values(globalState.voti)) {
+      for (const gId of Object.keys(naz)) giornateConVoti.add(gId);
+    }
+    for (const p of parts) {
+      let svCount = 0;
+      for (const gId of giornateConVoti) {
+        const rosa = getEffectiveRosa(p.id, gId) || state.rose[p.id];
+        if (!rosa) continue;
+        for (const [, arr] of Object.entries(rosa)) {
+          if (!Array.isArray(arr)) continue;
+          for (const g of arr) {
+            if (!g?.nome) continue;
+            const naz = normalizeNazione(g.nazione || "");
+            const entry = globalState.voti[naz]?.[gId]?.[safeKey(g.nome)];
+            if (entry?.sv) svCount++;
+          }
+        }
+      }
+      svPerPart.push({ p, svCount });
+    }
+    svPerPart.sort((a, b) => b.svCount - a.svCount || a.p.nome.localeCompare(b.p.nome));
+
+    // Bonus e malus per partecipante
+    for (const p of parts) {
+      let totalBonus = 0, totalMalus = 0;
+      for (const gId of giornateConVoti) {
+        const rosa = getEffectiveRosa(p.id, gId) || state.rose[p.id];
+        if (!rosa) continue;
+        for (const [ruolo, arr] of Object.entries(rosa)) {
+          if (!Array.isArray(arr)) continue;
+          for (const g of arr) {
+            if (!g?.nome) continue;
+            const naz = normalizeNazione(g.nazione || "");
+            const entry = globalState.voti[naz]?.[gId]?.[safeKey(g.nome)];
+            if (!entry || entry.sv) continue;
+            const { bonus, malus } = calcFlagsSeparati(entry.flags || {}, ruolo);
+            totalBonus = Math.round((totalBonus + bonus) * 10) / 10;
+            totalMalus = Math.round((totalMalus + malus) * 10) / 10;
+          }
+        }
+      }
+      bonusMalusPerPart.push({ p, totalBonus, totalMalus });
+    }
+    bonusMalusPerPart.sort((a, b) => b.totalBonus - a.totalBonus || a.p.nome.localeCompare(b.p.nome));
+  }
+
+  // ── HTML ─────────────────────────────────────────────────────
+  try { wrap.innerHTML = `
+    <div class="stats-grid">
+
+      <!-- Chi ha questo giocatore? -->
+      <div class="stats-card stats-card--full stats-search-card">
+        <h3 class="stats-card-title">🔍 Chi ha questo giocatore?</h3>
+        <div class="stats-search-filters">
+          <select class="stats-search-naz"><option value="">– Squadra –</option></select>
+          <select class="stats-search-player" disabled><option value="">– Giocatore –</option></select>
+        </div>
+        <div class="stats-search-result"></div>
+      </div>
+
+      <!-- Giocatori più scelti -->
+      <div class="stats-card stats-card--wide">
+        <h3 class="stats-card-title">🏅 Giocatori più scelti</h3>
+        <div class="stats-ownership-list">
+          ${topPlayers.map((g, i) => {
+            const pct = Math.round((g.count / totalParts) * 100);
+            return `<div class="stats-own-row">
+              <span class="stats-own-rank">${i + 1}</span>
+              <span class="stats-own-name">${g.nome}</span>
+              <span class="stats-own-flag">${_ruoloIcon(g.ruolo)}</span>
+              <span class="stats-own-naz">${g.nazione}</span>
+              <div class="stats-own-bar-wrap"><div class="stats-own-bar" style="width:${pct}%"></div></div>
+              <span class="stats-own-pct">${g.count}/${totalParts}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- Capitani più scelti -->
+      <div class="stats-card">
+        <h3 class="stats-card-title">👑 Capitani più scelti</h3>
+        ${topCaptains.length === 0
+          ? `<p class="hint">Nessun capitano ancora scelto.</p>`
+          : `<div class="stats-cap-list">
+              ${topCaptains.map(([nome, d], i) => {
+                const pct = Math.round((d.count / totalParts) * 100);
+                return `<div class="stats-cap-row">
+                  <span class="stats-rank-num">${i + 1}</span>
+                  <span class="stats-cap-name">${nome}</span>
+                  <span class="stats-cap-pct">${d.count}/${totalParts} · ${pct}%</span>
+                </div>`;
+              }).join("")}
+            </div>`
+        }
+      </div>
+
+      <!-- Scelte per nazione -->
+      <div class="stats-card">
+        <h3 class="stats-card-title">🗺 Scelte per nazione</h3>
+        <p class="stats-subtitle">Prima: nazioni con più scelte diverse (disaccordo)</p>
+        <div class="stats-naz-scelte-list">
+          ${nazioniOrdinate.map(({ naz, picks, unique }) => {
+            const picksHtml = picks.map(([nome, cnt]) =>
+              `<span class="stats-naz-pick ${cnt === picks[0][1] ? "top" : ""}">${nome} <em>${cnt}</em></span>`
+            ).join("");
+            return `<div class="stats-naz-scelta-row">
+              <span class="stats-naz-scelta-naz">${naz}</span>
+              <div class="stats-naz-scelta-picks">${picksHtml}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+
+
+      <!-- Giocatori più redditizi -->
+      <div class="stats-card stats-card--wide">
+        <h3 class="stats-card-title">⭐ Giocatori più redditizi</h3>
+        ${!hasVoti
+          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          : topScorers.length === 0
+            ? `<p class="hint">Nessun voto inserito ancora.</p>`
+            : `<div class="stats-scorer-grid">
+                ${topScorers.map((g, i) => `
+                  <div class="stats-scorer-row">
+                    <span class="stats-rank-num">${i + 1}</span>
+                    <span class="stats-own-flag">${_ruoloIcon(g.ruolo)}</span>
+                    <span class="stats-scorer-name">${g.nome}</span>
+                    <span class="stats-scorer-naz">${g.nazione}</span>
+                    <span class="stats-scorer-pts">${g.pts.toFixed(1)}</span>
+                  </div>
+                `).join("")}
+              </div>`
+        }
+      </div>
+
+      <!-- Rendimento capitani -->
+      <div class="stats-card stats-card--wide">
+        <h3 class="stats-card-title">🎖 Rendimento capitani</h3>
+        ${!hasVoti
+          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          : topCapScorers.length === 0
+            ? `<p class="hint">Nessun capitano con voti ancora.</p>`
+            : `<div class="stats-scorer-grid">
+                ${topCapScorers.map((c, i) => `
+                  <div class="stats-scorer-row">
+                    <span class="stats-rank-num">${i + 1}</span>
+                    <span class="stats-own-flag">${_ruoloIcon(c.capRuolo)}</span>
+                    <span class="stats-scorer-name">${c.capNome}</span>
+                    ${c.count > 1 ? `<span class="stats-scorer-sub">×${c.count}</span>` : `<span class="stats-scorer-sub"></span>`}
+                    <span class="stats-scorer-naz">${c.capNazione || ""}</span>
+                    <span class="stats-scorer-pts">${c.pts.toFixed(1)}</span>
+                  </div>
+                `).join("")}
+              </div>`
+        }
+      </div>
+
+      <!-- SV per partecipante -->
+      <div class="stats-card stats-card--wide">
+        <h3 class="stats-card-title">🚑 Giocatori SV per partecipante</h3>
+        ${!hasVoti
+          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          : `<div class="stats-scorer-grid">
+              ${svPerPart.map((item, i) => {
+                const cls = item.svCount === 0 ? "stats-sv-zero" : item.svCount <= 3 ? "stats-sv-mid" : "stats-sv-high";
+                return `<div class="stats-scorer-row">
+                  <span class="stats-rank-num">${i + 1}</span>
+                  <span class="stats-scorer-name">${item.p.nome}</span>
+                  <span class="stats-sv-count ${cls}">${item.svCount}</span>
+                </div>`;
+              }).join("")}
+            </div>`
+        }
+      </div>
+
+      <!-- Bonus e malus per partecipante -->
+      <div class="stats-card stats-card--wide">
+        <h3 class="stats-card-title">⚡ Bonus e malus per partecipante</h3>
+        ${!hasVoti
+          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          : `<div class="stats-bm-grid">
+              <div class="stats-bm-header">
+                <span></span><span></span>
+                <span class="stats-bm-col-label bns">Bns</span>
+                <span class="stats-bm-col-label mls">Mls</span>
+              </div>
+              ${bonusMalusPerPart.map((item, i) => `
+                <div class="stats-bm-row">
+                  <span class="stats-rank-num">${i + 1}</span>
+                  <span class="stats-bm-nome">${item.p.nome}</span>
+                  <span class="stats-bm-bns">+${item.totalBonus.toFixed(1)}</span>
+                  <span class="stats-bm-mls">${item.totalMalus > 0 ? `-${item.totalMalus.toFixed(1)}` : "–"}</span>
+                </div>
+              `).join("")}
+            </div>`
+        }
+      </div>
+
+      <!-- Tracker Sostituzioni -->
+      <div class="stats-card stats-card--full">
+        <h3 class="stats-card-title">🔄 Tracker Sostituzioni</h3>
+        <div class="stats-sost-list">
+          ${parts.map(p => {
+            const sost    = getSostEffective(p.id);
+            // Primo passaggio: conta il totale
+            let totalUsed = 0;
+            for (const fId of Object.keys(FINESTRE_TIMING)) totalUsed += (sost[fId] || []).length;
+            // Secondo passaggio: costruisce lo storico per finestra
+            const finestreHtml = Object.entries(FINESTRE_TIMING).map(([fId, f]) => {
+              const sostArr = sost[fId] || [];
+              if (!sostArr.length) return "";
+              return `<div class="stats-sost-finestra">
+                <span class="stats-sost-finestra-label">${f.label}</span>
+                <div class="stats-sost-swaps">
+                  ${sostArr.map(s => {
+                    const outNome = s.outNome || s.out || "?";
+                    const inNome  = s.inNome  || s.in  || "?";
+                    return `<span class="stats-sost-swap">${_ruoloIcon(s.ruolo)} <span class="out">${outNome}</span> → <span class="in">${inNome}</span></span>`;
+                  }).join("")}
+                </div>
+              </div>`;
+            }).join("");
+            const pct = Math.round(totalUsed / MAX_SOST_TOTALI * 100);
+            return `<div class="stats-sost-row">
+              <div class="stats-sost-header">
+                <span class="stats-sost-nome">${p.nome}</span>
+                <span class="stats-sost-count ${totalUsed === MAX_SOST_TOTALI ? "full" : totalUsed >= MAX_SOST_TOTALI - 1 ? "low" : ""}">${totalUsed}/${MAX_SOST_TOTALI}</span>
+              </div>
+              <div class="stats-sost-bar-wrap"><div class="stats-sost-bar ${totalUsed === MAX_SOST_TOTALI ? "full" : ""}" style="width:${pct}%"></div></div>
+              ${finestreHtml || `<p class="hint" style="margin:4px 0 0;font-size:12px">Nessuna sostituzione effettuata.</p>`}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+
+    </div>
+  `; } catch(e) {
+    console.error("[renderStats] errore rendering:", e);
+    wrap.innerHTML = `<p style="color:var(--accent2);padding:20px">Errore rendering statistiche: ${e.message}</p>`;
+  }
+
+  // ── Sezione ricerca proprietario ─────────────────────────────
+  const nazOpts = SQUADRE.map(n => `<option value="${n}">${n}</option>`).join("");
+  const searchCard = wrap.querySelector(".stats-search-card");
+  if (searchCard) {
+    searchCard.querySelector(".stats-search-naz").innerHTML = `<option value="">– Squadra –</option>${nazOpts}`;
+    searchCard.querySelector(".stats-search-player").innerHTML = `<option value="">– Giocatore –</option>`;
+    searchCard.querySelector(".stats-search-player").disabled = true;
+    searchCard.querySelector(".stats-search-result").innerHTML = "";
+  }
+
+  const selNaz    = wrap.querySelector(".stats-search-naz");
+  const selPlayer = wrap.querySelector(".stats-search-player");
+  const resEl     = wrap.querySelector(".stats-search-result");
+
+  if (selNaz && selPlayer && resEl) {
+    selNaz.addEventListener("change", () => {
+      const naz = selNaz.value;
+      selPlayer.innerHTML = `<option value="">– Giocatore –</option>`;
+      resEl.innerHTML = "";
+      if (!naz) { selPlayer.disabled = true; return; }
+      const seen = new Map();
+      for (const p of state.partecipanti) {
+        const rosa = getEffectiveRosa(p.id, 999);
+        if (!rosa) continue;
+        for (const [ruolo, arr] of Object.entries(rosa)) {
+          if (!Array.isArray(arr)) continue;
+          for (const g of arr) {
+            if (g?.nome && normalizeNazione(g.nazione || "") === normalizeNazione(naz))
+              seen.set(g.nome, ruolo);
+          }
+        }
+      }
+      const giocatori = [...seen.entries()].map(([nome, ruolo]) => ({ nome, ruolo })).sort((a, b) => a.nome.localeCompare(b.nome));
+      selPlayer.innerHTML = `<option value="">– Giocatore –</option>` +
+        giocatori.map(g => `<option value="${g.nome}" data-ruolo="${g.ruolo}">${g.nome}</option>`).join("");
+      selPlayer.disabled = false;
+    });
+
+    selPlayer.addEventListener("change", () => {
+      const nome = selPlayer.value;
+      const naz  = selNaz.value;
+      resEl.innerHTML = "";
+      if (!nome) return;
+      const normNaz = normalizeNazione(naz);
+      const owners = [];
+      for (const p of state.partecipanti) {
+        const rosa = getEffectiveRosa(p.id, 999);
+        if (!rosa) continue;
+        for (const arr of Object.values(rosa)) {
+          if (!Array.isArray(arr)) continue;
+          if (arr.some(g => g.nome === nome && normalizeNazione(g.nazione || "") === normNaz)) {
+            owners.push(p.nome); break;
+          }
+        }
+      }
+      if (!owners.length) {
+        resEl.innerHTML = `<p class="hint" style="margin:12px 0 0">Nessun partecipante ha scelto questo giocatore.</p>`;
+        return;
+      }
+      resEl.innerHTML = `<table class="stats-search-table">
+        <thead><tr><th>#</th><th>Partecipante</th></tr></thead>
+        <tbody>${owners.map((n, i) => `<tr><td>${i + 1}</td><td>${n}</td></tr>`).join("")}</tbody>
+      </table>`;
+    });
+  }
+}
+
 // ── GIORNATA ─────────────────────────────────────────────────
 function renderGiornata() { buildGiornata(); }
 
@@ -535,11 +1032,24 @@ function buildGiornata() {
 
   function buildCard(item, i) {
     const p   = item.p;
-    const rosa = state.rose[p.id];
+    const rosa = getEffectiveRosa(p.id, gId) || state.rose[p.id];
     const cap  = p.capitanoGiocatore;
     let body = "";
 
-    if (!rosa || !Object.values(rosa).some(a=>a.length)) {
+    // Rosa nascosta dal proprietario, visibile solo dopo il calcio d'inizio.
+    // Il proprietario vede sempre la propria.
+    const isMine      = currentUser && p.uid === currentUser.uid;
+    const isNascosta  = p.uid && !!_playerRoseState[p.uid]?.nascosta && !isDeadlinePassata();
+    const isHidden    = isNascosta && !isMine;   // nascosta agli ALTRI
+    const isMineHidden= isNascosta && isMine;    // la MIA rosa è nascosta (mostro il lucchetto anche a me)
+
+    if (isHidden) {
+      body = `<div style="padding:28px 12px;color:var(--text2);font-size:13px;text-align:center">
+        <span class="material-symbols-outlined" style="font-size:34px;opacity:.55">lock</span>
+        <p style="margin:8px 0 0;font-weight:600">Rosa nascosta dal proprietario</p>
+        <p style="margin:2px 0 0;font-size:11px">Sarà visibile dopo il calcio d'inizio</p>
+      </div>`;
+    } else if (!rosa || !Object.values(rosa).some(a=>a.length)) {
       body = `<div style="padding:12px;color:var(--text2);font-size:12px;text-align:center">Rosa non caricata</div>`;
     } else {
       const trows = Object.keys(RUOLI).map(ruolo => {
@@ -549,18 +1059,16 @@ function buildGiornata() {
           <span class="ruolo-badge ruolo-${ruolo}" style="font-size:10px;padding:2px 6px">${ruolo}</span>
           <span style="margin-left:6px;font-weight:600">${RUOLI[ruolo]} · ${arr.length}</span></td></tr>`;
         const rows = arr.map(g => {
-          const entry  = lookupVoto(globalState.voti[g.nazione]?.[gId], g.nome);
-          // Se la squadra ha voti per questa giornata ma il giocatore non c'è → non convocato/SV
-          const squadraHaVoti = globalState.voti[g.nazione]?.[gId] &&
-            Object.keys(globalState.voti[g.nazione][gId]).length > 0;
-          const isSV   = entry?.sv || (!entry && squadraHaVoti);
+          const entry  = globalState.voti[g.nazione]?.[gId]?.[safeKey(g.nome)];
           const isCap  = cap === g.nome;
+          const isSV   = entry?.sv;
           const v      = entry && !isSV ? parseFloat(entry.v)||0 : null;
           const { bonus, malus } = entry && !isSV ? calcFlagsSeparati(entry.flags||{}, ruolo) : { bonus:0, malus:0 };
           const capBonus = (isCap && ruolo!=="A" && v!==null && v>=7) ? 2 : 0;
           let totV = v !== null ? v + bonus - malus + capBonus : null;
           if (totV !== null) totV = Math.round(totV * 10) / 10;
           const negCls = totV!==null && totV<0 ? " tot-neg" : "";
+          const pending = !entry;
 
           // Celle bonus e malus
           const bonusTot = bonus + capBonus;
@@ -574,13 +1082,17 @@ function buildGiornata() {
           // Nome con capitano e badge bonus cap
           const capBadge = isCap
             ? (capBonus > 0
-                ? '<span class="cap-star cap-active" title="Capitano attivo! +2">⭐+2</span>'
-                : '<span class="cap-star" title="Capitano (voto < 7)">⭐</span>')
+                ? `<span class="cap-star cap-active" title="${t('common.captain')} +2">⭐+2</span>`
+                : `<span class="cap-star" title="${t('common.captain')}">⭐</span>`)
             : "";
 
-          return `<tr${isSV?' class="sv"':""}>
-            <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${g.nome}${capBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
-            <td style="font-size:12px;text-align:center">${isSV?'<span class="sv-text" style="font-size:11px">SV</span>':v!==null?`<span class="voto-num">${v.toFixed(1)}</span>`:'<span class="voto-dash">–</span>'}</td>
+          const elimNaz = isNazioneEliminata(g.nazione, gId);
+          const elimStyle = elimNaz ? "opacity:.45;text-decoration:line-through;" : "";
+          const elimBadge = elimNaz ? ' <span title="Club eliminato" style="font-size:10px;text-decoration:none;display:inline-block">🚫</span>' : "";
+
+          return `<tr${isSV?' class="sv"':''}${elimNaz?' class="elim-row"':""}>
+            <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${elimStyle}">${g.nome}${capBadge}${elimBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
+            <td style="font-size:12px;text-align:center">${isSV?'<span class="sv-text" style="font-size:11px">SV</span>':v!==null?`<span class="voto-num">${v.toFixed(1)}</span>`:pending?'<span style="color:var(--orange);font-size:11px;font-weight:700">?</span>':'<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? mlsCell : '<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? bnsCell : '<span class="voto-dash">–</span>'}</td>
             <td style="text-align:center;padding-right:12px">${totV!==null?`<span class="tot-num${negCls}" style="font-size:15px">${totV.toFixed(1)}</span>`:'<span class="voto-dash">–</span>'}</td>
@@ -602,10 +1114,15 @@ function buildGiornata() {
     }
 
     const pendingWarn = item.pending ? ` <span style="font-size:10px;color:var(--orange)">⚠</span>` : "";
+    const lockIcon = isHidden
+      ? ` <span title="Rosa nascosta dal proprietario" style="font-size:12px">🔒</span>`
+      : isMineHidden
+      ? ` <span title="La tua rosa è nascosta agli altri" style="font-size:11px;opacity:.7">🔒</span>`
+      : "";
     return `<div class="acc-item" id="acc_${p.id}" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
       <div class="acc-header" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s;" data-id="${p.id}">
         <span style="font-family:'Outfit',sans-serif;font-size:18px;color:${rankColor(i)};flex-shrink:0">${i<3?medals[i]:i+1}</span>
-        <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nome}${pendingWarn}</span>
+        <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nome}${lockIcon}${pendingWarn}</span>
         <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;color:var(--accent);flex-shrink:0">${item.pts.toFixed(1)}</span>
         <span class="acc-chevron" style="font-size:12px;color:var(--text2);flex-shrink:0;transition:transform .25s">▼</span>
       </div>
@@ -683,7 +1200,7 @@ function renderVoti() {
   const sel = document.getElementById("selectSquadra");
   if (sel.options.length <= 1) {
     let opts = '<option value="">– Seleziona –</option>';
-    for (const n of NAZIONALI) opts += `<option value="${n}">${n}</option>`;
+    for (const n of SQUADRE) opts += `<option value="${n}">${n}</option>`;
     sel.innerHTML = opts;
   }
   renderVotiTable();
@@ -696,8 +1213,9 @@ function getGiocatoriNazione(naz) {
   const giocSet = new Map();
   for (const rosa of Object.values(state.rose)) {
     for (const [ruolo, arr] of Object.entries(rosa)) {
+      if (!Array.isArray(arr)) continue;
       for (const g of arr) {
-        if (g.nazione === naz && !giocSet.has(g.nome)) giocSet.set(g.nome, { nome:g.nome, ruolo });
+        if (g?.nazione === naz && !giocSet.has(g.nome)) giocSet.set(g.nome, { nome:g.nome, ruolo });
       }
     }
   }
@@ -719,16 +1237,24 @@ function renderVotiTable() {
   if (!naz) { wrap.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>Seleziona una squadra.</p></div>`; banner.style.display="none"; return; }
 
   const giocatori = getGiocatoriNazione(naz);
-  const isEdit    = votiUnlocked;
+  const nazElim   = isNazioneEliminata(naz, gId);
+  const isEdit    = votiUnlocked && !nazElim;
   const savedVoti = (globalState.voti[naz]||{})[gId]||{};
+
+  // eliminated banner (priorità massima)
+  if (nazElim) {
+    banner.className = "voti-banner elim";
+    banner.textContent = `🚫 ${naz} è stata eliminata dal torneo — i voti sono bloccati`;
+    banner.style.display = "block";
+  }
 
   // pending banner
   const pending = countPendingVotiSquadra(naz, gId);
-  if (pending > 0) {
+  if (!nazElim && pending > 0) {
     banner.className = "voti-banner warn";
     banner.textContent = `⚠ ${pending} giocator${pending===1?"e":"i"} senza voto in questa giornata`;
     banner.style.display = "block";
-  } else if (giocatori.length > 0) {
+  } else if (!nazElim && giocatori.length > 0) {
     banner.className = "voti-banner ok";
     banner.textContent = `✅ Tutti i voti inseriti per questa giornata`;
     banner.style.display = "block";
@@ -737,7 +1263,7 @@ function renderVotiTable() {
   }
 
   const rows = giocatori.map(g => {
-    const entry = lookupVoto(savedVoti, g.nome) || {};
+    const entry = savedVoti[safeKey(g.nome)] || {};
     const isSV  = !!entry.sv;
     const v     = entry.v !== undefined ? entry.v : "";
     const flags = entry.flags || {};
@@ -756,14 +1282,14 @@ function renderVotiTable() {
           const count = val || 0;
           const isActive = count > 0;
           // Show explicit counter with - / count / + buttons for multi flags
-          return `<span class="flag-multi-wrap ${f.cls}${isActive?" active":""}" data-flag="${f.key}" data-nome="${g.nome}">
-            <button class="flag-multi-dec" data-flag="${f.key}" data-nome="${g.nome}" title="Rimuovi ${f.label}" ${count===0?"disabled":""}>−</button>
+          return `<span class="flag-multi-wrap ${f.cls}${isActive?" active":""}" data-flag="${f.key}" data-nome="${safeKey(g.nome)}">
+            <button class="flag-multi-dec" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="Rimuovi ${f.label}" ${count===0?"disabled":""}>−</button>
             <span class="flag-multi-label" title="${f.label}">${f.label.split(' ')[0]} <span class="flag-multi-count">${count}</span></span>
-            <button class="flag-multi-inc" data-flag="${f.key}" data-nome="${g.nome}" title="Aggiungi ${f.label}">+</button>
+            <button class="flag-multi-inc" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="Aggiungi ${f.label}">+</button>
           </span>`;
         } else {
           const isActive = !!val;
-          return `<button class="flag-btn ${f.cls}${isActive?" active":""}" data-flag="${f.key}" data-multi="false" data-nome="${g.nome}" title="${f.label}">
+          return `<button class="flag-btn ${f.cls}${isActive?" active":""}" data-flag="${f.key}" data-multi="false" data-nome="${safeKey(g.nome)}" title="${f.label}">
             ${f.label}
           </button>`;
         }
@@ -785,14 +1311,14 @@ function renderVotiTable() {
     }
 
     const vInput = isEdit
-      ? `<input type="number" class="inp-v" data-nome="${g.nome}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV?"disabled style='opacity:.4'":""}>`
+      ? `<input type="number" class="inp-v" data-nome="${safeKey(g.nome)}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV?"disabled style='opacity:.4'":""}>`
       : `<span style="font-weight:600">${isSV?"<em style='color:var(--text2)'>SV</em>":v!==""?parseFloat(v).toFixed(1):"–"}</span>`;
 
     const svBtn = isEdit
-      ? `<button class="sv-btn${isSV?" active":""}" data-nome="${g.nome}" title="Senza Voto">SV</button>`
+      ? `<button class="sv-btn${isSV?" active":""}" data-nome="${safeKey(g.nome)}" title="Senza Voto">SV</button>`
       : "";
 
-    return `<tr data-nome="${g.nome}" data-ruolo="${g.ruolo}"${isSV?' class="sv-row"':""}>
+    return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"${isSV?' class="sv-row"':""}>
       <td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td>
       <td style="font-weight:600;font-size:14px">${g.nome}</td>
       <td class="center">${vInput}${svBtn}</td>
@@ -993,9 +1519,20 @@ function renderAdmin(){
   if(banner&&currentLegaId){
     const link=`${location.origin}${location.pathname}?lega=${currentLegaId}`;
     const nome=currentLegaMeta?.nome||currentLegaId;
-    banner.innerHTML=`<span>🏆 <strong>${nome}</strong> · <strong>${currentLegaId}</strong></span>
-      <button class="btn-sec" style="font-size:11px;padding:3px 9px;margin-left:8px"
-        onclick="navigator.clipboard.writeText('${link}').then(()=>toast('Link copiato!'))">📋 Link</button>`;
+    const waMsg=encodeURIComponent(`🏆 Entra nella mia lega ArenaSerieA "${nome}" per la Serie A 2026/27!\n👉 ${link}`);
+    banner.innerHTML=`
+      <span>🏆 <strong>${nome}</strong> · <span style="font-size:11px;opacity:.7">${currentLegaId}</span></span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn-sec" style="font-size:11px;padding:3px 10px"
+          onclick="navigator.clipboard.writeText('${link}').then(()=>toast('📋 Link copiato!'))">📋 Copia link</button>
+        <a href="https://wa.me/?text=${waMsg}" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:11px;padding:3px 10px;cursor:pointer;text-decoration:none;font-weight:600">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.529 5.855L.057 23.882l6.198-1.625A11.935 11.935 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.504-5.186-1.385l-.372-.22-3.679.965.98-3.585-.242-.379A9.943 9.943 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+          WhatsApp
+        </a>
+        ${navigator.share ? `<button class="btn-sec" style="font-size:11px;padding:3px 10px"
+          onclick="navigator.share({title:'ArenaSerieA – ${nome}',text:'Entra nella mia lega ArenaSerieA per la Serie A 2026/27!',url:'${link}'}).catch(()=>{})">↗ Condividi</button>` : ''}
+      </div>`;
     banner.style.display="flex";
   }
   renderPartecipantiList();
@@ -1003,6 +1540,59 @@ function renderAdmin(){
   renderSostituzioni();
   populateSel("selectPartecipanteImport",state.partecipanti,"nome","id","– Seleziona –","");
   renderRoseStatus();
+  loadPushSubCount();
+}
+
+// ── ADMIN PUSH NOTIFICATIONS ─────────────────────────────
+async function loadPushSubCount() {
+  const el = document.getElementById("pushSubCount");
+  if (!el || !currentLegaId || !window._db) return;
+  try {
+    const snap = await new Promise(resolve =>
+      window._onVal(window._ref(window._db, `leghe/${currentLegaId}/pushSubscriptions`), resolve, { onlyOnce: true })
+    );
+    const count = snap.val() ? Object.keys(snap.val()).length : 0;
+    el.textContent = count
+      ? `🔔 ${count} partecipant${count !== 1 ? "i" : "e"} con notifiche attive`
+      : "Nessun partecipante ha attivato le notifiche";
+  } catch(e) { el.textContent = ""; }
+}
+
+async function sendAdminPush(title, body) {
+  const t_ = title || document.getElementById("pushTitle")?.value?.trim() || "Fantasy Arena";
+  const b_ = body  || document.getElementById("pushBody")?.value?.trim() || "";
+  const resEl = document.getElementById("pushSendResult");
+  const btn   = document.getElementById("btnSendPush");
+
+  if (!currentLegaId) { toast("Nessuna lega attiva", true); return; }
+  if (!b_) { toast("Inserisci un messaggio", true); return; }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Invio..."; }
+  if (resEl) resEl.textContent = "";
+
+  try {
+    const res = await fetch(".netlify/functions/push-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        legaId: currentLegaId,
+        title: t_,
+        body: b_,
+        url: `${location.origin}${location.pathname}?lega=${currentLegaId}`,
+        secret: "push"   // corrisponde a ADMIN_PUSH_SECRET su Netlify
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (resEl) resEl.innerHTML = `<span style="color:var(--green)">✓ Inviate: ${data.sent ?? "?"} · Fallite: ${data.failed ?? 0}</span>`;
+    toast(`🔔 Push inviata a ${data.sent ?? "?"} utenti!`);
+  } catch(e) {
+    if (resEl) resEl.innerHTML = `<span style="color:var(--red)">Errore: ${e.message}</span>`;
+    toast("Errore invio push", true);
+    console.error(e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">send</span> Invia a tutti'; }
+  }
 }
 
 function renderGiornataCorrenteAdmin() {
@@ -1036,13 +1626,25 @@ async function eliminaLega() {
     toast("Lega eliminata.");
     exitLega();
   } catch(e) {
-    toast("Errore durante l'eliminazione: " + e.message, true);
+    console.error("eliminaLega error:", e);
+    const msg = e.code === "PERMISSION_DENIED"
+      ? "Permesso negato — assicurati di essere l'admin e di aver aggiornato le regole Firebase."
+      : "Errore durante l'eliminazione: " + e.message;
+    toast(msg, true);
   }
 }
 
 document.addEventListener("click", e => {
   if (e.target && e.target.id === "btnResetPartecipanti") resetPartecipantiERose();
   if (e.target && e.target.id === "btnEliminaLega") eliminaLega();
+  if (e.target && e.target.id === "btnSendPush") sendAdminPush();
+  if (e.target && e.target.id === "btnPushPresetVoti") {
+    const gLabel = GIORNATE[globalState.giornataCorrente || "1"];
+    sendAdminPush("⚽ Voti disponibili!", `I voti della ${gLabel} sono pronti. Controlla la classifica!`);
+  }
+  if (e.target && e.target.id === "btnPushPresetClassifica") {
+    sendAdminPush("🏆 Classifica aggiornata!", "La classifica è stata aggiornata. Vieni a vedere la tua posizione!");
+  }
 });
 
 function renderRoseStatus() {
@@ -1139,7 +1741,7 @@ document.getElementById("btnExportJSON")?.addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  a.href = url; a.download = `fantaseriea_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.href = url; a.download = `fantasy_arena_backup_${new Date().toISOString().slice(0,10)}.json`;
   a.click(); URL.revokeObjectURL(url);
   toast("Backup esportato!");
 });
@@ -1205,7 +1807,7 @@ function processRosaFile(file) {
         renderCapitanoForm(); renderRoseStatus(); toast("Rosa caricata!");
       } else { res.style.color="var(--red)"; res.textContent="Formato non riconosciuto."; }
     };
-    reader.readAsText(file, "UTF-8");
+    reader.readAsText(file);
   } else {
     res.style.color="var(--accent2)"; res.textContent="Per Excel: salva come CSV poi ricarica.";
   }
@@ -1247,7 +1849,7 @@ function parseSuperGiocatoriCSV(csv) {
     const parts = lines[i].split(sep).map(s => s.trim());
     if (parts.length <= Math.max(iNome, iSquadra, iRuolo)) { skippati++; continue; }
     const nome    = parts[iNome];
-    const squadra = parts[iSquadra];
+    const squadra = normalizeNazione(parts[iSquadra]);
     const ruolo   = parts[iRuolo].toUpperCase().charAt(0); // prende solo la prima lettera: "POR"→"P"
     if (!nome || !squadra || !RUOLI_VALIDI[ruolo]) { skippati++; continue; }
     if (!db[squadra]) db[squadra] = [];
@@ -1265,7 +1867,9 @@ function syncGiocatori(){
   if(!globalState.giocatoriSquadra)globalState.giocatoriSquadra={};
   for(const rosa of Object.values(state.rose)){
     for(const [ruolo,arr] of Object.entries(rosa)){
+      if(!Array.isArray(arr))continue;
       for(const g of arr){
+        if(!g?.nome)continue;
         if(!state.giocatoriSquadra[g.nazione])state.giocatoriSquadra[g.nazione]=[];
         if(!state.giocatoriSquadra[g.nazione].some(x=>x.nome===g.nome))
           state.giocatoriSquadra[g.nazione].push({nome:g.nome,ruolo});
@@ -1309,10 +1913,10 @@ function buildManualForm(partId) {
 }
 
 function manualRow(ruolo,idx,nome,nazione) {
-  const opts=NAZIONALI.map(n=>`<option value="${n}" ${n===nazione?"selected":""}>${n}</option>`).join("");
+  const opts=SQUADRE.map(n=>`<option value="${n}" ${n===nazione?"selected":""}>${n}</option>`).join("");
   return `<div class="manual-gioc-row" data-ruolo="${ruolo}">
     <input type="text" class="inp-man-nome" placeholder="Nome giocatore" value="${nome}">
-    <select class="inp-man-naz"><option value="">– Squadra –</option>${opts}</select>
+    <select class="inp-man-naz"><option value="">– Nazione –</option>${opts}</select>
     <button class="btn-rm-gioc" type="button">✕</button>
   </div>`;
 }
@@ -1339,115 +1943,587 @@ document.getElementById("btnSalvaManual")?.addEventListener("click",()=>{
 
 
 // ── GRAFICO STORICO ──────────────────────────────────────────
+let _graficoChart = null;
+let _graficoFilterMode = "top5"; // "top5" | "top10" | "tutti"
+
 function renderGrafico() {
   const wrap = document.getElementById("graficoWrap");
   if (!wrap) return;
+
   if (!state.partecipanti || !state.partecipanti.length) {
+    if (_graficoChart) { _graficoChart.destroy(); _graficoChart = null; }
     wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>Nessun dato disponibile.</p></div>`;
     return;
   }
-  const giornateIds = Object.keys(GIORNATE).map(Number).sort((a,b)=>a-b);
-  const colors = ["#e8ff3a","#ff6b35","#2ecc71","#3498db","#9b59b6","#e74c3c","#f39c12","#1abc9c","#e91e8c","#00bcd4","#ff5722","#8bc34a"];
-  const W = wrap.clientWidth || 600;
-  const H = 260;
-  const PAD = { top:20, right:20, bottom:40, left:44 };
-  const chartW = W - PAD.left - PAD.right;
-  const chartH = H - PAD.top - PAD.bottom;
 
-  // Compute cumulative pts per partecipante per giornata
-  const series = state.partecipanti.map((p, ci) => {
+  if (typeof Chart === "undefined") {
+    wrap.innerHTML = `<div class="empty-state"><p>Grafico non disponibile offline.</p></div>`;
+    return;
+  }
+
+  const GIORNATE_KICKOFF = {
+    1: Date.parse("2026-06-11T19:00:00Z"),
+    2: Date.parse("2026-06-18T16:00:00Z"),
+    3: Date.parse("2026-06-24T19:00:00Z"),
+    4: Date.parse("2026-07-01T00:00:00Z"),
+    5: Date.parse("2026-07-04T00:00:00Z"),
+    6: Date.parse("2026-07-07T00:00:00Z"),
+    7: Date.parse("2026-07-11T00:00:00Z"),
+    8: Date.parse("2026-07-14T00:00:00Z"),
+  };
+  const now       = Date.now();
+  const giornateIds = Object.keys(GIORNATE_FALLBACK).map(Number).sort((a, b) => a - b);
+  const playedIds   = giornateIds.filter(id => now >= (GIORNATE_KICKOFF[id] || 0));
+
+  if (!playedIds.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>Il torneo non è ancora iniziato.</p></div>`;
+    return;
+  }
+
+  const allParts = state.partecipanti;
+
+  // Punteggio cumulativo per ogni partecipante ad ogni giornata disputata
+  const cumScore = {}; // [partId][gId]
+  for (const p of allParts) {
+    cumScore[p.id] = {};
     let cum = 0;
-    const points = giornateIds.map(gId => {
+    for (const gId of playedIds) {
       cum += calcolaPuntiGiornata(p.id, String(gId));
-      return cum;
+      cumScore[p.id][gId] = parseFloat(cum.toFixed(1));
+    }
+  }
+
+  // Rank di ogni partecipante ad ogni giornata disputata
+  const rankAt = {}; // [partId][gId]
+  for (const gId of playedIds) {
+    const sorted = [...allParts].sort((a, b) =>
+      (cumScore[b.id][gId] ?? 0) - (cumScore[a.id][gId] ?? 0)
+    );
+    sorted.forEach((p, i) => {
+      if (!rankAt[p.id]) rankAt[p.id] = {};
+      rankAt[p.id][gId] = i + 1;
     });
-    return { nome: p.nome, points, color: colors[ci % colors.length] };
+  }
+
+  // Classifica finale per scegliere top N
+  const lastGId  = playedIds[playedIds.length - 1];
+  const totals   = allParts
+    .map(p => ({ p, rank: rankAt[p.id]?.[lastGId] ?? 9999 }))
+    .sort((a, b) => a.rank - b.rank);
+
+  const N    = _graficoFilterMode === "top5" ? 5 : _graficoFilterMode === "top10" ? 10 : allParts.length;
+  let shown  = totals.slice(0, N).map(x => x.p);
+
+  // Utente loggato: sempre incluso, messo per ultimo (renderizzato sopra)
+  const myPartId = _getMyPartId?.();
+  const myPart   = myPartId ? allParts.find(p => p.id === myPartId) : null;
+  const meInTop  = myPart && shown.some(p => p.id === myPartId);
+  if (myPart && !meInTop) shown = [...shown, myPart];
+  if (myPart) { shown = shown.filter(p => p.id !== myPartId); shown.push(myPart); }
+
+  const palette = ["#ff6b35","#2ecc71","#3498db","#9b59b6","#e74c3c","#f39c12","#1abc9c","#e91e8c","#00bcd4","#ff5722","#8bc34a","#607d8b"];
+  const labels  = giornateIds.map(id => GIORNATE_FALLBACK[id]);
+
+  const datasets = shown.map((p, ci) => {
+    const isMe = p.id === myPartId;
+    const data = giornateIds.map(gId =>
+      now < (GIORNATE_KICKOFF[gId] || 0) ? null : (rankAt[p.id]?.[gId] ?? null)
+    );
+    const color = isMe ? "#e8ff3a" : palette[ci % palette.length];
+    return {
+      label: isMe ? `⭐ ${p.nome}` : p.nome,
+      data,
+      borderColor: color,
+      backgroundColor: color + "20",
+      pointBackgroundColor: color,
+      pointRadius: isMe ? 6 : 4,
+      pointHoverRadius: isMe ? 9 : 7,
+      borderWidth: isMe ? 3.5 : 2,
+      tension: 0,   // linee angolari — stile bump chart
+      fill: false,
+    };
   });
 
-  const allVals = series.flatMap(s => s.points);
-  const maxVal = Math.max(...allVals, 1);
-  const minVal = Math.min(...allVals, 0);
-  const range = maxVal - minVal || 1;
+  // maxRank reale: il rank più alto tra i partecipanti mostrati
+  const allRankVals = shown.flatMap(p => playedIds.map(gId => rankAt[p.id]?.[gId] ?? 0)).filter(r => r > 0);
+  const maxRank     = allRankVals.length ? Math.max(...allRankVals) : shown.length;
 
-  const xStep = chartW / (giornateIds.length - 1 || 1);
-  const yScale = v => chartH - ((v - minVal) / range) * chartH;
-  const xScale = i => i * xStep;
+  const isMobile    = window.innerWidth < 600;
+  const chartHeight = isMobile ? 340 : 420;
+  const rightPad    = isMobile ? 80 : 110;
+  const labelFont   = isMobile ? 10 : 11;
 
-  // Grid lines
-  const gridLines = [0,0.25,0.5,0.75,1].map(t => {
-    const v = minVal + t * range;
-    const y = yScale(v);
-    return `<line x1="0" y1="${y}" x2="${chartW}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
-    <text x="-6" y="${y+4}" text-anchor="end" font-size="9" fill="#8892a4">${v.toFixed(0)}</text>`;
-  }).join("");
-
-  // X axis labels
-  const xLabels = giornateIds.map((gId, i) =>
-    `<text x="${xScale(i)}" y="${chartH+18}" text-anchor="middle" font-size="9" fill="#8892a4">${GIORNATE[gId]}</text>`
+  // Barra filtri
+  const filterBtns = [
+    { mode: "top5",  label: "Top 5"  },
+    { mode: "top10", label: "Top 10" },
+    { mode: "tutti", label: "Tutti"  },
+  ].map(({ mode, label }) =>
+    `<button class="grafico-filter-btn${_graficoFilterMode === mode ? " grafico-filter-btn--active" : ""}" data-mode="${mode}">${label}</button>`
   ).join("");
+  const meBadge = myPart && !meInTop
+    ? `<span class="grafico-me-badge">+ ${myPart.nome} (tu)</span>` : "";
 
-  // Lines + dots
-  const seriesSvg = series.map(s => {
-    const pts = giornateIds.map((_, i) => `${xScale(i)},${yScale(s.points[i])}`).join(" ");
-    const dots = giornateIds.map((_, i) =>
-      `<circle cx="${xScale(i)}" cy="${yScale(s.points[i])}" r="3" fill="${s.color}" stroke="var(--bg2)" stroke-width="1.5">
-        <title>${s.nome}: ${s.points[i].toFixed(1)} pt</title>
-      </circle>`
-    ).join("");
-    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
-    ${dots}`;
-  }).join("");
-
-  // Legend
-  const legend = series.map(s =>
-    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap">
-      <span style="display:inline-block;width:12px;height:3px;border-radius:2px;background:${s.color}"></span>${s.nome}
-    </span>`
-  ).join("");
+  if (_graficoChart) { _graficoChart.destroy(); _graficoChart = null; }
 
   wrap.innerHTML = `
-    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(${PAD.left},${PAD.top})">
-        ${gridLines}
-        ${xLabels}
-        ${seriesSvg}
-      </g>
-    </svg>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:8px 0 0 ${PAD.left}px">${legend}</div>`;
+    <div class="grafico-filter-bar">
+      <div class="grafico-filter-btns">${filterBtns}${meBadge}</div>
+    </div>
+    <div style="position:relative;height:${chartHeight}px;width:100%"><canvas id="graficoCanvas"></canvas></div>`;
+
+  wrap.querySelectorAll(".grafico-filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => { _graficoFilterMode = btn.dataset.mode; renderGrafico(); });
+  });
+
+  // Plugin: label a destra del chartArea, ancorate all'ultimo rank noto
+  const endLabelPlugin = {
+    id: "endLabels",
+    afterDraw(chart) {
+      const ctx  = chart.ctx;
+      const area = chart.chartArea;
+      const entries = [];
+      chart.data.datasets.forEach((ds, di) => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        let lastPt = null;
+        for (let i = meta.data.length - 1; i >= 0; i--) {
+          if (ds.data[i] !== null) { lastPt = meta.data[i]; break; }
+        }
+        if (!lastPt) return;
+        entries.push({ y: lastPt.y, text: ds.label.replace("⭐ ", ""), color: ds.borderColor, bold: ds.label.startsWith("⭐") });
+      });
+      entries.sort((a, b) => a.y - b.y);
+      const gap = labelFont + 3;
+      for (let i = 1; i < entries.length; i++) {
+        if (entries[i].y - entries[i - 1].y < gap) entries[i].y = entries[i - 1].y + gap;
+      }
+      entries.forEach(e => {
+        const y = Math.max(area.top + 6, Math.min(area.bottom - 6, e.y));
+        ctx.save();
+        ctx.font = `${e.bold ? "bold " : ""}${labelFont}px -apple-system,sans-serif`;
+        ctx.fillStyle = e.color;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(e.text, area.right + 6, y);
+        ctx.restore();
+      });
+    }
+  };
+
+  _graficoChart = new Chart(document.getElementById("graficoCanvas").getContext("2d"), {
+    type: "line",
+    plugins: [endLabelPlugin],
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      layout: { padding: { right: rightPad } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1e2535",
+          titleColor: "#e2e8f0",
+          bodyColor: "#8892a4",
+          borderColor: "rgba(255,255,255,.1)",
+          borderWidth: 1,
+          padding: 10,
+          itemSort: (a, b) => a.parsed.y - b.parsed.y,
+          callbacks: {
+            label: ctx => {
+              const name = ctx.dataset.label.replace("⭐ ", "");
+              const p    = allParts.find(x => x.nome === name);
+              const gId  = playedIds[ctx.dataIndex] ?? null;
+              const pts  = p && gId ? (cumScore[p.id]?.[gId] ?? 0) : 0;
+              return ` ${ctx.dataset.label}: ${ctx.parsed.y}° · ${pts} pt`;
+            },
+            labelColor: ctx => ({ borderColor: ctx.dataset.borderColor, backgroundColor: ctx.dataset.borderColor }),
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "#8892a4", font: { size: isMobile ? 9 : 10 }, maxRotation: isMobile ? 45 : 0 }, grid: { color: "rgba(255,255,255,.06)" } },
+        y: {
+          position: "left",
+          reverse: true,
+          min: 0.5,
+          max: maxRank + 0.5,
+          ticks: {
+            color: "#8892a4",
+            font: { size: isMobile ? 9 : 10 },
+            stepSize: 1,
+            callback: v => Number.isInteger(v) ? `${v}°` : "",
+          },
+          grid: { color: "rgba(255,255,255,.06)" }
+        }
+      }
+    }
+  });
+}
+
+// ── CHAT DI LEGA ─────────────────────────────────────────
+let _chatUnsubscribe = null;
+
+function renderChat() {
+  const wrap = document.getElementById("chatWrap");
+  const msgEl = document.getElementById("chatMessages");
+  if (!wrap) return;
+
+  if (!currentLegaId) {
+    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">Entra in una lega per usare la chat.</div>`;
+    return;
+  }
+  if (!currentUser) {
+    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">Accedi per usare la chat.</div>`;
+    return;
+  }
+
+  // Cleanup previous listener
+  _stopChatListener();
+
+  if (msgEl) msgEl.innerHTML = '';
+
+  // Real-time listener
+  const chatRef = window._query(
+    window._ref(window._db, `leghe/${currentLegaId}/chat`),
+    window._limitToLast(100)
+  );
+
+  _chatUnsubscribe = window._onChildAdded(chatRef, snap => {
+    const msg = snap.val();
+    if (!msg || !msg.text) return;
+    _appendChatMessage(msg, snap.key);
+  });
+
+  // Bind send button
+  const input = document.getElementById("chatInput");
+  const btn = document.getElementById("btnChatSend");
+  if (btn && !btn._chatBound) {
+    btn._chatBound = true;
+    const sendFn = () => {
+      const text = input?.value?.trim();
+      if (!text) return;
+      _sendChatMessage(text);
+      if (input) input.value = '';
+    };
+    btn.addEventListener("click", sendFn);
+    input?.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendFn(); } });
+  }
+}
+
+function _appendChatMessage(msg, key) {
+  const msgEl = document.getElementById("chatMessages");
+  if (!msgEl) return;
+  const isMine = currentUser && msg.uid === currentUser.uid;
+  const time = msg.ts ? new Date(msg.ts).toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" }) : "";
+  const div = document.createElement("div");
+  div.className = `chat-msg${isMine ? " mine" : ""}`;
+  div.dataset.key = key;
+  div.innerHTML = `
+    ${!isMine ? `<span class="chat-msg-author">${_escHtml(msg.nome || "?")}</span>` : ""}
+    <div class="chat-msg-bubble">
+      <span class="chat-msg-text">${_escHtml(msg.text)}</span>
+      <span class="chat-msg-time">${time}</span>
+    </div>`;
+  msgEl.appendChild(div);
+  msgEl.scrollTop = msgEl.scrollHeight;
+}
+
+function _escHtml(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function _sendChatMessage(text) {
+  if (!currentLegaId || !currentUser || !text) return;
+  if (!window._push || !window._db) { toast("Firebase non disponibile", true); return; }
+  const nome = currentUser.displayName || currentUser.email?.split("@")[0] || "Anonimo";
+  try {
+    await window._push(window._ref(window._db, `leghe/${currentLegaId}/chat`), {
+      uid: currentUser.uid,
+      nome,
+      text: text.slice(0, 300),
+      ts: Date.now()
+    });
+  } catch(e) {
+    toast("Errore invio messaggio", true);
+    console.error(e);
+  }
+}
+
+function _stopChatListener() {
+  if (_chatUnsubscribe) {
+    try { _chatUnsubscribe(); } catch(e) {}
+    _chatUnsubscribe = null;
+  }
+}
+
+// ── PUSH NOTIFICATIONS ───────────────────────────────────
+const VAPID_PUBLIC_KEY = "BJ1B-EW7e5SaoaynPQKWm6iSLHYFmxVboi7AtfFhJjCDC6fcAeFyWnUm27vPUT76QiSvjyjhthoHsqYGcFAfyFg";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    toast("Push non supportato dal browser", true); return;
+  }
+  if (!currentLegaId || !currentUser) {
+    toast("Entra in una lega per attivare le notifiche", true); return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") { toast("Notifiche non autorizzate", true); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    const res = await fetch(".netlify/functions/push-subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON(), legaId: currentLegaId, uid: currentUser.uid })
+    });
+    if (!res.ok) throw new Error("Server error");
+    toast("🔔 Notifiche attivate!");
+    _updatePushBtn(true);
+  } catch(e) {
+    console.error(e);
+    toast("Errore attivazione notifiche", true);
+  }
+}
+
+async function unsubscribeFromPush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    toast("🔕 Notifiche disattivate");
+    _updatePushBtn(false);
+  } catch(e) {
+    toast("Errore disattivazione notifiche", true);
+  }
+}
+
+async function _updatePushBtn(subscribed) {
+  const btn = document.getElementById("btnPushToggle");
+  if (!btn) return;
+  btn.textContent = subscribed ? "🔕 Disattiva notifiche" : "🔔 Attiva notifiche";
+  btn.onclick = subscribed ? unsubscribeFromPush : subscribeToPush;
+}
+
+async function initPushBtn() {
+  const btn = document.getElementById("btnPushToggle");
+  if (!btn || !("PushManager" in window)) {
+    if (btn) btn.style.display = "none";
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    _updatePushBtn(!!sub);
+  } catch(e) {
+    if (btn) btn.style.display = "none";
+  }
 }
 
 // ── SOSTITUZIONI ─────────────────────────────────────────────
-// 6 finestre, una ogni 5 giornate (G5/G10/G15/G20/G25/G30)
-// 4 cambi per finestra, max 1 per ruolo per finestra
-const FINESTRE = [
-  { id:1, label:"Finestra 1", desc:"Entro fine Giornata 5",  giornataMax: 5  },
-  { id:2, label:"Finestra 2", desc:"Entro fine Giornata 10", giornataMax: 10 },
-  { id:3, label:"Finestra 3", desc:"Entro fine Giornata 15", giornataMax: 15 },
-  { id:4, label:"Finestra 4", desc:"Entro fine Giornata 20", giornataMax: 20 },
-  { id:5, label:"Finestra 5", desc:"Entro fine Giornata 25", giornataMax: 25 },
-  { id:6, label:"Finestra 6", desc:"Entro fine Giornata 30", giornataMax: 30 },
-];
-const MAX_SOST_PER_FINESTRA = 4; // cambi disponibili per ogni finestra
-const MAX_SOST_TOTALI = MAX_SOST_PER_FINESTRA; // alias usato nelle funzioni di controllo (per finestra)
+// SERIE A: una finestra ogni 5 giornate (dopo G5, G10, ... G30 = 6 finestre;
+// nessuna finestra prima di G36). Le sost. della finestra N valgono da G(5N+1) in poi.
+// Limite: max 3 cambi PER RUOLO in tutta la stagione (nessun cap totale separato).
+const FINESTRE = Array.from({ length: 6 }, (_, i) => ({
+  id: i + 1,
+  label: `Finestra ${i + 1}`,
+  desc: `Dopo G${(i + 1) * 5} · prima di G${(i + 1) * 5 + 1}`,
+}));
+const MAX_SOST_PER_RUOLO = 3;                    // max per ruolo in tutta la stagione
+const MAX_SOST_TOTALI    = MAX_SOST_PER_RUOLO * 4; // 12 = 3 × 4 ruoli (il vincolo reale è per-ruolo)
+
+// Finestre allineate al calendario: aprono ~4 giorni prima della giornata
+// successiva (5N+1) e chiudono poco prima del suo primo fischio d'inizio.
+const FINESTRE_TIMING = {
+  1: { open: "2026-10-07T12:00:00Z", close: "2026-10-11T12:00:00Z", label: "Finestra 1" }, // prima di G6
+  2: { open: "2026-11-04T12:00:00Z", close: "2026-11-08T12:00:00Z", label: "Finestra 2" }, // prima di G11
+  3: { open: "2026-12-16T12:00:00Z", close: "2026-12-20T12:00:00Z", label: "Finestra 3" }, // prima di G16
+  4: { open: "2027-01-20T12:00:00Z", close: "2027-01-24T12:00:00Z", label: "Finestra 4" }, // prima di G21
+  5: { open: "2027-02-24T12:00:00Z", close: "2027-02-28T12:00:00Z", label: "Finestra 5" }, // prima di G26
+  6: { open: "2027-04-07T12:00:00Z", close: "2027-04-11T12:00:00Z", label: "Finestra 6" }, // prima di G31
+};
 
 // Stato UI locale per sostituzioni (non salvato)
 let _sostSelectedPart = "";
 let _finestreAperte = {}; // { "pid_fid": true }
+
+// Stato globale player self-service sost (sincronizzato da Firebase)
+// { [uid]: { [finestraId]: [ { outNome, outNazione, ruolo, inNome, inNazione } ] } }
+let _playerSostState = {};
+let _sostEditMode    = null; // { finestraId, idx, sost } quando si modifica una sost esistente
+let _playerSostUnsubscribe = null;
+
+// ── ISCRIZIONE E ROSA SELF-SERVICE (playerRose) ───────────────
+// Ogni utente scrive il proprio nodo leghe/{id}/playerRose/{uid}.
+// È così che i partecipanti si auto-registrano senza intervento admin.
+let _playerRoseState = {};
+let _playerRoseUnsubscribe = null;
+
+function subscribePlayerRose(legaId) {
+  if (_playerRoseUnsubscribe) { _playerRoseUnsubscribe(); _playerRoseUnsubscribe = null; }
+  if (!window._onVal || !window._db) return;
+  const path = window._ref(window._db, `leghe/${legaId}/playerRose`);
+  _playerRoseUnsubscribe = window._onVal(path, snap => {
+    _playerRoseState = snap.val() || {};
+    mergePlayerRoseIntoState();
+    renderPage(currentPage());
+  }, err => {
+    console.warn("⚠️ subscribePlayerRose error:", err.code, "— retry in 5s");
+    _playerRoseUnsubscribe = null;
+    setTimeout(() => { if (currentLegaId === legaId) subscribePlayerRose(legaId); }, 5000);
+  });
+}
+
+// Fonde i partecipanti/rose auto-registrati nello state in-memory.
+// I membri auto-iscritti gestiscono la propria rosa (fonte di verità = playerRose);
+// i partecipanti aggiunti manualmente dall'admin (senza uid) restano intatti.
+function mergePlayerRoseIntoState() {
+  if (!_playerRoseState || typeof _playerRoseState !== "object") return;
+  if (!Array.isArray(state.partecipanti)) state.partecipanti = [];
+  state.partecipanti = state.partecipanti.filter(Boolean);
+  if (!state.rose || typeof state.rose !== "object") state.rose = {};
+  for (const [uid, data] of Object.entries(_playerRoseState)) {
+    if (!data) continue;
+    let part = state.partecipanti.find(p => p && p.uid === uid);
+    if (!part) {
+      part = { id: uid, nome: data.nome || "Giocatore", uid, capitanoGiocatore: null };
+      state.partecipanti.push(part);
+    } else if (data.nome && !part._adminNome) {
+      part.nome = data.nome;
+    }
+    if (data.rosa && typeof data.rosa === "object") {
+      state.rose[part.id] = data.rosa;
+    }
+    if (data.capitano !== undefined) {
+      part.capitanoGiocatore = data.capitano || null;
+    }
+  }
+}
+
+// Scrive la propria iscrizione/rosa su Firebase (nodo self-service)
+async function _saveMyPlayerRose(patch) {
+  if (!currentUser || !currentLegaId || !window._db || !window._set || !window._ref) return false;
+  const uid = currentUser.uid;
+  const nomeDefault = currentUser.displayName || currentUser.email?.split('@')[0] || "Giocatore";
+  const existing = _playerRoseState[uid] || {};
+  const payload = {
+    nome:     existing.nome || nomeDefault,
+    joinedAt: existing.joinedAt || Date.now(),
+    rosa:     existing.rosa || null,
+    capitano: existing.capitano ?? null,
+    nascosta: existing.nascosta ?? false,
+    ...patch,
+    updatedAt: Date.now()
+  };
+  try {
+    await window._set(window._ref(window._db, `leghe/${currentLegaId}/playerRose/${uid}`), payload);
+    _playerRoseState[uid] = payload;
+    mergePlayerRoseIntoState();
+    return true;
+  } catch(e) { console.warn("_saveMyPlayerRose:", e); return false; }
+}
+
+// Registra l'utente come membro della lega al primo ingresso (se non già presente)
+async function _ensureMyMembership() {
+  if (!currentUser || !currentLegaId || !window._db || !window._onVal || !window._ref) return;
+  const uid = currentUser.uid;
+  // Se l'admin mi ha già aggiunto come partecipante per uid, non serve
+  if (state.partecipanti?.find(p => p.uid === uid)) return;
+  try {
+    const snap = await new Promise((res, rej) => {
+      try { window._onVal(window._ref(window._db, `leghe/${currentLegaId}/playerRose/${uid}`), res, { onlyOnce: true }); }
+      catch(e) { rej(e); }
+    });
+    if (snap.exists()) return; // già iscritto: non sovrascrivere la rosa esistente
+    const nome = currentUser.displayName || currentUser.email?.split('@')[0] || "Giocatore";
+    await window._set(window._ref(window._db, `leghe/${currentLegaId}/playerRose/${uid}`), {
+      nome, joinedAt: Date.now(), rosa: null, capitano: null, updatedAt: Date.now()
+    });
+  } catch(e) { console.warn("_ensureMyMembership:", e); }
+}
+
+// Ritorna l'id della finestra attualmente aperta (1|2|3) o null
+function getCurrentFinestraAperta() {
+  const now = Date.now();
+  for (const [id, f] of Object.entries(FINESTRE_TIMING)) {
+    const openMs  = new Date(f.open).getTime();
+    const closeMs = f.close ? new Date(f.close).getTime() : Infinity;
+    if (now >= openMs && now < closeMs) return Number(id);
+  }
+  return null;
+}
+
+// Sostituzioni effettive per un partecipante:
+// le sost. admin (state.sostituzioni) hanno priorità su quelle self-service
+function getSostEffective(partId) {
+  const uid = state.partecipanti?.find(p => p.id === partId)?.uid;
+  const adminSost  = state.sostituzioni?.[partId] || {};
+  const playerSost = uid ? (_playerSostState[uid] || {}) : {};
+  const merged = {};
+  const allFid = new Set([...Object.keys(adminSost), ...Object.keys(playerSost)]);
+  for (const fId of allFid) {
+    const a = adminSost[fId];
+    merged[fId] = (Array.isArray(a) && a.length > 0) ? a : (playerSost[fId] || []);
+  }
+  return merged;
+}
+
+// Rosa effettiva per un partecipante in una giornata specifica (applica sost.)
+// Finestra N vale dalla giornata N+1 in poi
+function getEffectiveRosa(partId, gId) {
+  const base = state.rose[partId];
+  if (!base) return null;
+  let rosa = JSON.parse(JSON.stringify(base));
+  const giornataNum = Number(gId);
+  const allSost = getSostEffective(partId);
+  const capitano = state.partecipanti?.find(p => p.id === partId)?.capitanoGiocatore || null;
+  for (const [fIdStr, sosts] of Object.entries(allSost)) {
+    const fId = Number(fIdStr);
+    if (giornataNum <= fId) continue; // finestra N vale da giornata N+1
+    for (const s of (sosts || [])) {
+      if (capitano && s.outNome === capitano) continue; // il capitano non può essere sostituito
+      const arr = rosa[s.ruolo];
+      if (!arr) continue;
+      const idx = arr.findIndex(g => g.nome === s.outNome && g.nazione === s.outNazione);
+      if (idx !== -1) arr[idx] = { nome: s.inNome, nazione: s.inNazione };
+    }
+  }
+  return rosa;
+}
+
+// Listener Firebase per playerSostituzioni di tutta la lega
+function subscribePlayerSostituzioni(legaId) {
+  if (_playerSostUnsubscribe) { _playerSostUnsubscribe(); _playerSostUnsubscribe = null; }
+  if (!window._onVal || !window._db) return;
+  const path = window._ref(window._db, `leghe/${legaId}/playerSostituzioni`);
+  _playerSostUnsubscribe = window._onVal(path, snap => {
+    _playerSostState = snap.val() || {};
+    // Re-render se siamo nella pagina classifica, giornata, squadra o stats
+    const activePage = document.querySelector(".page.active")?.id;
+    if (activePage === "page-classifica") renderClassifica();
+    if (activePage === "page-giornata")   renderGiornata();
+    if (activePage === "page-squadra")    renderSostSelfService();
+    if (activePage === "page-stats")      renderStats();
+  });
+}
 
 function getSostituzioniPartecipante(partId) {
   if (!state.sostituzioni) state.sostituzioni = {};
   if (!state.sostituzioni[partId]) state.sostituzioni[partId] = {};
   return state.sostituzioni[partId];
 }
-// Conta le sostituzioni usate in UNA specifica finestra
-function countSostFinestra(partId, finestraId) {
-  const smap = getSostituzioniPartecipante(partId);
-  const arr = smap[finestraId];
-  return Array.isArray(arr) ? arr.length : 0;
-}
-// Alias per compatibilità con il codice esistente — conta per finestra
 function countSostTotali(partId) {
-  // Non usato direttamente nel nuovo sistema, ma mantenuto per sicurezza
   const smap = getSostituzioniPartecipante(partId);
   return Object.values(smap).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
 }
@@ -1494,6 +2570,7 @@ function renderSostituzioni() {
     </div>
   </div>`;
 
+  // Usa il primo partecipante se nessuno selezionato
   if (!_sostSelectedPart && state.partecipanti.length) {
     _sostSelectedPart = state.partecipanti[0].id;
   }
@@ -1501,34 +2578,61 @@ function renderSostituzioni() {
   if (!p) { div.innerHTML = filterBar; return; }
 
   const rosa = state.rose[p.id];
-  const smap = getSostituzioniPartecipante(p.id);
+  const totUsate = countSostTotali(p.id);
+  const totRim = MAX_SOST_TOTALI - totUsate;
 
-  // ── Storico globale ──
+  // ── Storico effettivo (admin + player) ──
+  const uid = state.partecipanti.find(x => x.id === p.id)?.uid;
+  const sostEffective = getSostEffective(p.id);
   const storicoRows = FINESTRE.flatMap(f => {
-    const arr = smap[f.id] || [];
-    return arr.map((s, si) => `<div class="sost-storico-row">
-      <span class="sost-finestra-badge">F${f.id}</span>
-      <span class="ruolo-badge ruolo-${s.ruolo}">${s.ruolo}</span>
-      <span class="sost-out">▼ ${s.out}</span>
-      <span class="sost-arrow">→</span>
-      <span class="sost-in">▲ ${s.in}</span>
-      <span class="sost-naz">(${s.nazione})</span>
-      <button class="btn-del sost-del" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" title="Annulla">✕</button>
-    </div>`);
+    const arr = sostEffective[f.id] || [];
+    if (!arr.length) return [];
+    const isAdminFin = Array.isArray(state.sostituzioni?.[p.id]?.[f.id]) && state.sostituzioni[p.id][f.id].length > 0;
+    return arr.map((s, si) => {
+      // Supporta sia vecchio formato admin (out/in/nazione) sia nuovo (outNome/inNome/outNazione)
+      const outNome = isAdminFin ? (s.outNome || s.out)     : s.outNome;
+      const inNome  = isAdminFin ? (s.inNome  || s.in)      : s.inNome;
+      const naz     = isAdminFin ? (s.outNazione || s.nazione) : s.outNazione;
+      const typeBadge = isAdminFin
+        ? '<span class="sost-admin-badge">admin</span>'
+        : '<span class="sost-player-badge">player</span>';
+      return `<div class="sost-storico-row">
+        <span class="sost-finestra-badge">F${f.id}</span>
+        <span class="ruolo-badge ruolo-${s.ruolo}">${s.ruolo}</span>
+        ${typeBadge}
+        <span class="sost-out">▼ ${outNome}</span>
+        <span class="sost-arrow">→</span>
+        <span class="sost-in">▲ ${inNome}</span>
+        <span class="sost-naz">(${naz})</span>
+        <button class="sost-edit-admin" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Modifica">✏️</button>
+        <button class="btn-del sost-del" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Elimina">🗑️</button>
+      </div>`;
+    });
   }).join("");
 
   // ── Finestre ──
   const finestreHtml = FINESTRE.map(f => {
-    const usatiFinestra = countSostFinestra(p.id, f.id);
-    const rimasti       = MAX_SOST_PER_FINESTRA - usatiFinestra;
-    const ruoliUsati    = getRuoliUsatiInFinestra(p.id, f.id);
-    const ruoliDisp     = Object.keys(RUOLI).filter(r => !ruoliUsati.includes(r));
-    const limitRagg     = usatiFinestra >= MAX_SOST_PER_FINESTRA;
-    const key           = `${p.id}_${f.id}`;
-    const isAperta      = !!_finestreAperte[key];
+    const ruoliUsatiQuesta = getRuoliUsatiInFinestra(p.id, f.id);
+    // Conta utilizzi per ruolo su TUTTE le finestre — escludi se raggiunto MAX_SOST_PER_RUOLO
+    const roleCount = {};
+    for (const f2 of FINESTRE) {
+      for (const s of (sostEffective[f2.id] || [])) {
+        roleCount[s.ruolo] = (roleCount[s.ruolo] || 0) + 1;
+      }
+    }
+    const ruoliEsclusiAdmin = new Set(
+      Object.keys(RUOLI).filter(r =>
+        ruoliUsatiQuesta.includes(r) || (roleCount[r] || 0) >= MAX_SOST_PER_RUOLO
+      )
+    );
+    const ruoliUsati = ruoliUsatiQuesta; // per badge (solo questa finestra)
+    const ruoliDisp  = Object.keys(RUOLI).filter(r => !ruoliEsclusiAdmin.has(r));
+    const limitRagg  = totUsate >= MAX_SOST_TOTALI;
+    const key        = `${p.id}_${f.id}`;
+    const isAperta   = !!_finestreAperte[key];
 
-    const usedBadge = `<span style="font-size:11px;color:var(--text2)">${usatiFinestra}/${MAX_SOST_PER_FINESTRA} cambi usati</span>`;
-    const ruoliBadge = ruoliUsati.length
+    // Header finestra con pulsante apri/chiudi
+    const usedBadge = ruoliUsati.length
       ? `<span style="font-size:11px;color:var(--text2)">Ruoli usati: ${ruoliUsati.join(", ")}</span>` : "";
     const canOpen = rosa && !limitRagg && ruoliDisp.length > 0;
     const btnLabel = isAperta ? "▲ Chiudi" : "＋ Aggiungi sostituzione";
@@ -1554,14 +2658,14 @@ function renderSostituzioni() {
       </div>
       <div class="sost-nuovo-wrap" id="sostNuovo_${p.id}_${f.id}" style="display:none">
         <div class="sost-nuovo-box">
-          <p style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:10px">✏️ Nuovo giocatore — squadra e ruolo verranno ereditati automaticamente</p>
+          <p style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:10px">✏️ Nuovo giocatore — nazione e ruolo verranno ereditati automaticamente</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
             <div class="filter-item" style="flex:1;min-width:150px">
               <label>Nome giocatore</label>
-              <input type="text" class="sost-nuovo-nome" placeholder="Es. Lookman" data-pid="${p.id}" data-fid="${f.id}">
+              <input type="text" class="sost-nuovo-nome" placeholder="Es. Camavinga" data-pid="${p.id}" data-fid="${f.id}">
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;color:var(--text2)">Squadra</label>
+              <label style="font-size:11px;color:var(--text2)">Nazione</label>
               <span class="sost-nuovo-naz-label" style="font-size:13px;font-weight:700;color:var(--text2);padding:8px 11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;min-width:100px">–</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
@@ -1577,7 +2681,7 @@ function renderSostituzioni() {
     const limitMsg = !rosa
       ? `<p class="hint" style="margin:0">Carica prima la rosa.</p>`
       : limitRagg
-      ? `<p class="hint" style="margin:0;color:var(--red)">Limite di ${MAX_SOST_PER_FINESTRA} cambi per questa finestra raggiunto.</p>`
+      ? `<p class="hint" style="margin:0;color:var(--red)">Limite di ${MAX_SOST_TOTALI} sostituzioni totali raggiunto.</p>`
       : ruoliDisp.length === 0
       ? `<p class="hint" style="margin:0">Tutti i ruoli già usati in questa finestra.</p>`
       : "";
@@ -1588,7 +2692,6 @@ function renderSostituzioni() {
         <span style="font-weight:700">${f.label}</span>
         <span class="hint" style="margin:0;font-size:11px">${f.desc}</span>
         ${usedBadge}
-        ${ruoliBadge}
         <div style="margin-left:auto">
           ${canOpen
             ? `<button class="${btnStyle} sost-btn-toggle" data-key="${key}" style="font-size:12px;padding:5px 12px">${btnLabel}</button>`
@@ -1603,7 +2706,7 @@ function renderSostituzioni() {
     `<div class="sost-partecipante-block">
       <div class="sost-part-header">
         <span class="sost-part-nome">${p.nome}</span>
-        <span style="font-size:13px;color:var(--text2)">Cambi totali usati: <strong style="color:var(--accent)">${countSostTotali(p.id)}</strong></span>
+        <span class="sost-counter ${totRim===0?"zero":totRim<=1?"low":""}">${totUsate}/${MAX_SOST_TOTALI} sostituzioni usate</span>
       </div>
       ${storicoRows ? `<div class="sost-storico">${storicoRows}</div>` : ""}
       ${finestreHtml}
@@ -1625,97 +2728,10 @@ function renderSostituzioni() {
     });
   });
 
-  // Annulla sostituzione
-  div.querySelectorAll(".sost-del").forEach(btn => {
-    btn.addEventListener("click", function() {
-      const {pid, fid, idx} = this.dataset;
-      const smap2 = getSostituzioniPartecipante(pid);
-      if (!smap2[fid]) return;
-      const rimossa = smap2[fid][Number(idx)];
-      if (!confirm(`Annullare la sostituzione ${rimossa.out} → ${rimossa.in}?`)) return;
-      smap2[fid].splice(Number(idx), 1);
-      // Ripristina la rosa
-      const rosa2 = state.rose[pid];
-      if (rosa2 && rosa2[rimossa.ruolo]) {
-        const idxR = rosa2[rimossa.ruolo].findIndex(g => g.nome===rimossa.in && g.nazione===rimossa.nazione);
-        if (idxR >= 0) rosa2[rimossa.ruolo][idxR] = { nome:rimossa.out, nazione:rimossa.nazione };
-      }
-      saveState(); renderSostituzioni(); toast("Sostituzione annullata.");
-    });
-  });
-
   // Populate OUT when ruolo changes
   div.querySelectorAll(".sost-sel-ruolo").forEach(sel => {
     populateSostOut(sel);
     sel.addEventListener("change", function() { populateSostOut(this); });
-  });
-
-  // Conferma sostituzione
-  div.querySelectorAll(".sost-btn-add").forEach(btn => {
-    btn.addEventListener("click", function() {
-      const pid = this.dataset.pid, fid = Number(this.dataset.fid);
-      const row = this.closest(".sost-form-row");
-      const ruolo  = row.querySelector(".sost-sel-ruolo")?.value;
-      const outSel = row.querySelector(".sost-sel-out");
-      const inSel  = row.querySelector(".sost-sel-in");
-      const outNome = outSel?.value;
-      const inNome  = inSel?.value;
-      const naz = outSel?.options[outSel.selectedIndex]?.dataset?.naz;
-      if (!ruolo || !outNome || !inNome || !naz || inNome === "__nuovo__") {
-        toast("Compila tutti i campi!", true); return;
-      }
-      const smap2 = getSostituzioniPartecipante(pid);
-      if (!smap2[fid]) smap2[fid] = [];
-      // Controllo limite finestra
-      if (smap2[fid].length >= MAX_SOST_PER_FINESTRA) {
-        toast(`Limite di ${MAX_SOST_PER_FINESTRA} cambi per questa finestra raggiunto!`, true); return;
-      }
-      smap2[fid].push({ ruolo, out:outNome, in:inNome, nazione:naz });
-      // Aggiorna la rosa
-      const rosa3 = state.rose[pid];
-      if (rosa3 && rosa3[ruolo]) {
-        const idxR = rosa3[ruolo].findIndex(g => g.nome===outNome && g.nazione===naz);
-        if (idxR >= 0) rosa3[ruolo][idxR] = { nome:inNome, nazione:naz };
-      }
-      _finestreAperte[`${pid}_${fid}`] = false;
-      saveState(); renderSostituzioni();
-      toast(`✓ ${outNome} → ${inNome}`);
-    });
-  });
-
-  // Nuovo giocatore
-  div.querySelectorAll(".sost-btn-nuovo").forEach(btn => {
-    btn.addEventListener("click", function() {
-      const pid = this.dataset.pid, fid = Number(this.dataset.fid);
-      const nuovoWrap = document.getElementById(`sostNuovo_${pid}_${fid}`);
-      const nomeInput = nuovoWrap?.querySelector(".sost-nuovo-nome");
-      const nazLabel  = nuovoWrap?.querySelector(".sost-nuovo-naz-label");
-      const ruoloLabel= nuovoWrap?.querySelector(".sost-nuovo-ruolo-label");
-      const row = document.querySelector(`.sost-form-row[data-pid="${pid}"][data-fid="${fid}"]`);
-      const ruolo   = row?.querySelector(".sost-sel-ruolo")?.value;
-      const outSel2 = row?.querySelector(".sost-sel-out");
-      const outNome = outSel2?.value;
-      const naz     = outSel2?.options[outSel2.selectedIndex]?.dataset?.naz;
-      const inNome  = nomeInput?.value?.trim();
-      if (!inNome) { toast("Inserisci il nome del nuovo giocatore!", true); return; }
-      const smap2 = getSostituzioniPartecipante(pid);
-      if (!smap2[fid]) smap2[fid] = [];
-      if (smap2[fid].length >= MAX_SOST_PER_FINESTRA) {
-        toast(`Limite di ${MAX_SOST_PER_FINESTRA} cambi per questa finestra raggiunto!`, true); return;
-      }
-      smap2[fid].push({ ruolo, out:outNome, in:inNome, nazione:naz });
-      // Aggiorna la rosa
-      const rosa4 = state.rose[pid];
-      if (rosa4 && rosa4[ruolo]) {
-        const idxR = rosa4[ruolo].findIndex(g => g.nome===outNome && g.nazione===naz);
-        if (idxR >= 0) rosa4[ruolo][idxR] = { nome:inNome, nazione:naz };
-        else rosa4[ruolo].push({ nome:inNome, nazione:naz });
-      }
-      syncGiocatori();
-      _finestreAperte[`${pid}_${fid}`] = false;
-      saveState(); renderSostituzioni();
-      toast(`✓ Nuovo: ${inNome} al posto di ${outNome}`);
-    });
   });
 }
 
@@ -1727,13 +2743,16 @@ function populateSostOut(ruoloSel) {
   if (!row) return;
   const outSel = row.querySelector(".sost-sel-out");
   const inSel  = row.querySelector(".sost-sel-in");
-  const rosa   = state.rose[pid];
+  // Usa la rosa effettiva a quella finestra (applica sost. finestre precedenti)
+  const rosa   = getEffectiveRosa(pid, Number(fid)) || state.rose[pid];
   if (!rosa || !ruolo) return;
 
+  const capitanoNomeAdmin = state.partecipanti?.find(p => p.id === pid)?.capitanoGiocatore || null;
   outSel.innerHTML = `<option value="">– Seleziona –</option>` +
-    (rosa[ruolo] || []).map(g =>
-      `<option value="${g.nome}" data-naz="${g.nazione}">${g.nome} (${g.nazione})</option>`
-    ).join("");
+    (rosa[ruolo] || [])
+      .filter(g => g.nome !== capitanoNomeAdmin)  // il capitano non può essere sostituito
+      .map(g => `<option value="${g.nome}" data-naz="${g.nazione}">${g.nome} (${g.nazione})</option>`)
+      .join("");
   inSel.innerHTML = `<option value="">– prima seleziona OUT –</option>`;
 
   // reset nuovo box
@@ -1782,19 +2801,14 @@ function confirmaSostituzione(pid, fid, ruolo, outNome, naz, inNome) {
   if (!state.sostituzioni[pid]) state.sostituzioni[pid] = {};
   if (!state.sostituzioni[pid][fid]) state.sostituzioni[pid][fid] = [];
 
-  // Applica alla rosa
-  const rosa = state.rose[pid];
-  if (rosa && rosa[ruolo]) {
-    const idx = rosa[ruolo].findIndex(g => g.nome === outNome);
-    if (idx !== -1) rosa[ruolo][idx] = { nome: inNome, nazione: naz };
-  }
-  // Aggiungi a giocatoriSquadra se nuovo
+  // Aggiungi a giocatoriSquadra se nuovo (senza mutare la rosa base)
   if (!state.giocatoriSquadra[naz]) state.giocatoriSquadra[naz] = [];
   if (!state.giocatoriSquadra[naz].some(g => g.nome === inNome)) {
     state.giocatoriSquadra[naz].push({ nome: inNome, ruolo });
   }
 
-  state.sostituzioni[pid][fid].push({ ruolo, out: outNome, in: inNome, nazione: naz });
+  // Stesso formato delle sost. player: delta applicato da getEffectiveRosa
+  state.sostituzioni[pid][fid].push({ ruolo, outNome, outNazione: naz, inNome, inNazione: naz });
   _finestreAperte[`${pid}_${fid}`] = false;
   saveState();
   renderAdmin();
@@ -1837,26 +2851,62 @@ document.addEventListener("click", e => {
     confirmaSostituzione(pid, fid, ruolo, outNome, naz, inNome);
   }
 
-  // Annulla sostituzione
+  // Elimina sostituzione
   if (e.target && e.target.classList.contains("sost-del")) {
-    const pid = e.target.dataset.pid;
-    const fid = parseInt(e.target.dataset.fid);
-    const idx = parseInt(e.target.dataset.idx);
-    if (!confirm("Annullare questa sostituzione? La rosa verrà ripristinata.")) return;
+    const pid  = e.target.dataset.pid;
+    const fid  = parseInt(e.target.dataset.fid);
+    const idx  = parseInt(e.target.dataset.idx);
+    const type = e.target.dataset.type;
+    const uid  = e.target.dataset.uid;
+    if (!confirm("Eliminare questa sostituzione?")) return;
+    _adminDeleteSost(pid, fid, idx, type, uid).then(() => {
+      renderAdmin();
+      toast("Sostituzione eliminata.");
+    });
+  }
+
+  // Modifica sostituzione (delete + riapri form)
+  if (e.target && e.target.classList.contains("sost-edit-admin")) {
+    const pid  = e.target.dataset.pid;
+    const fid  = parseInt(e.target.dataset.fid);
+    const idx  = parseInt(e.target.dataset.idx);
+    const type = e.target.dataset.type;
+    const uid  = e.target.dataset.uid;
+    _adminDeleteSost(pid, fid, idx, type, uid).then(() => {
+      _finestreAperte[`${pid}_${fid}`] = true;
+      renderAdmin();
+      toast("Sostituzione rimossa — modifica e riconferma.");
+    });
+  }
+});
+
+async function _adminDeleteSost(pid, fid, idx, type, uid) {
+  if (type === "admin") {
     const sost = state.sostituzioni?.[pid]?.[fid]?.[idx];
     if (sost) {
-      const rosa = state.rose[pid];
-      if (rosa && rosa[sost.ruolo]) {
-        const i = rosa[sost.ruolo].findIndex(g => g.nome === sost.in);
-        if (i !== -1) rosa[sost.ruolo][i] = { nome: sost.out, nazione: sost.nazione };
+      // Formato vecchio (out/in/nazione): ripristina la rosa base che era stata mutata
+      if (sost.out !== undefined) {
+        const rosa = state.rose[pid];
+        if (rosa && rosa[sost.ruolo]) {
+          const i = rosa[sost.ruolo].findIndex(g => g.nome === sost.in);
+          if (i !== -1) rosa[sost.ruolo][i] = { nome: sost.out, nazione: sost.nazione };
+        }
       }
+      // Formato nuovo (outNome/inNome): niente da ripristinare, era solo un delta
       state.sostituzioni[pid][fid].splice(idx, 1);
     }
     saveState();
-    renderAdmin();
-    toast("Sostituzione annullata.");
+  } else {
+    // player sost: rimuovi da Firebase
+    if (!uid || !currentLegaId || !window._db || !window._set || !window._ref) return;
+    const existing = (_playerSostState[uid]?.[fid]) || [];
+    const updated  = existing.filter((_, i) => i !== idx);
+    await window._set(
+      window._ref(window._db, `leghe/${currentLegaId}/playerSostituzioni/${uid}/${fid}`),
+      updated.length > 0 ? updated : null
+    );
   }
-});
+}
 
 // ── HELPERS ───────────────────────────────────────────────────
 function populateSel(id,items,labelKey,valueKey,placeholder,placeholderVal) {
@@ -1986,18 +3036,27 @@ function renderSidebar() {
   } else {
     // Not logged in: show login form
     content.innerHTML = `
-      <div class="sidebar-auth-header">Accedi o Registrati</div>
+      <div class="sidebar-auth-header">${t("sidebar.login_header")}</div>
       <div class="auth-tabs" style="margin-bottom:16px">
-        <button class="auth-tab active" data-tab="login">Accedi</button>
-        <button class="auth-tab" data-tab="register">Registrati</button>
+        <button class="auth-tab active" data-tab="login">${t("sidebar.tab_login")}</button>
+        <button class="auth-tab" data-tab="register">${t("sidebar.tab_register")}</button>
       </div>
       <div id="sidebarAuthLogin" class="auth-form">
         <div class="field-group"><label>Email</label><input type="email" id="sidebarEmail" placeholder="tua@email.com" autocomplete="email"></div>
         <div class="field-group"><label>Password</label><input type="password" id="sidebarPwd" placeholder="Password" autocomplete="current-password"></div>
-        <button class="btn-primary" id="btnSidebarLogin" style="width:100%">Accedi</button>
+        <button class="btn-primary" id="btnSidebarLogin" style="width:100%">${t("sidebar.btn_login")}</button>
         <p class="pwd-error" id="sidebarLoginErr"></p>
-        <p style="text-align:center;margin-top:10px">
-          <a href="#" id="btnForgotPwd" style="color:var(--text2);font-size:13px;text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">Password dimenticata?</a>
+        <p style="text-align:center;margin-top:8px">
+          <button id="btnForgotPwd" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;transition:color .2s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">${t("sidebar.forgot_pwd")}</button>
+        </p>
+      </div>
+      <div id="sidebarAuthReset" class="auth-form" style="display:none">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5">${t("sidebar.reset_desc")}</p>
+        <div class="field-group"><label>Email</label><input type="email" id="sidebarResetEmail" placeholder="tua@email.com" autocomplete="email"></div>
+        <button class="btn-primary" id="btnSidebarReset" style="width:100%">${t("sidebar.reset_btn")}</button>
+        <p class="pwd-error" id="sidebarResetErr"></p>
+        <p style="text-align:center;margin-top:8px">
+          <button id="btnBackToLogin" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;transition:color .2s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">← ${t("sidebar.back_login")}</button>
         </p>
       </div>
       <div id="sidebarAuthRegister" class="auth-form" style="display:none">
@@ -2010,11 +3069,42 @@ function renderSidebar() {
 
     content.querySelectorAll(".auth-tab").forEach(tab => {
       tab.addEventListener("click", function() {
-        content.querySelectorAll(".auth-tab").forEach(t=>t.classList.remove("active"));
+        content.querySelectorAll(".auth-tab").forEach(tab2=>tab2.classList.remove("active"));
         this.classList.add("active");
         document.getElementById("sidebarAuthLogin").style.display = this.dataset.tab==="login"?"":"none";
         document.getElementById("sidebarAuthRegister").style.display = this.dataset.tab==="register"?"":"none";
       });
+    });
+
+    // ── Forgot password ──────────────────────────────────────
+    document.getElementById("btnForgotPwd")?.addEventListener("click", () => {
+      const email = document.getElementById("sidebarEmail")?.value.trim();
+      document.getElementById("sidebarAuthLogin").style.display = "none";
+      document.getElementById("sidebarAuthReset").style.display = "";
+      if (email) document.getElementById("sidebarResetEmail").value = email;
+      document.getElementById("sidebarAuthReset").querySelector("input")?.focus();
+    });
+    document.getElementById("btnBackToLogin")?.addEventListener("click", () => {
+      document.getElementById("sidebarAuthReset").style.display = "none";
+      document.getElementById("sidebarAuthLogin").style.display = "";
+      document.getElementById("sidebarResetErr").textContent = "";
+    });
+    document.getElementById("btnSidebarReset")?.addEventListener("click", async () => {
+      const email = document.getElementById("sidebarResetEmail").value.trim();
+      const err = document.getElementById("sidebarResetErr");
+      const btn = document.getElementById("btnSidebarReset");
+      if (!email) { err.textContent = "Inserisci la tua email."; err.style.color="var(--red)"; return; }
+      btn.textContent = "⏳..."; btn.disabled = true;
+      const res = await resetPassword(email);
+      btn.disabled = false;
+      if (res.error) {
+        err.textContent = res.error; err.style.color = "var(--red)";
+        btn.textContent = t("sidebar.reset_btn");
+      } else {
+        err.style.color = "var(--green)";
+        err.textContent = t("sidebar.reset_sent");
+        btn.textContent = "✓ Inviata";
+      }
     });
 
     document.getElementById("btnSidebarLogin")?.addEventListener("click", async () => {
@@ -2024,33 +3114,11 @@ function renderSidebar() {
       if (!email||!pwd) { err.textContent="Compila tutti i campi!"; return; }
       document.getElementById("btnSidebarLogin").textContent="⏳...";
       const res = await signIn(email, pwd);
-      if (res.error) { err.textContent=res.error; document.getElementById("btnSidebarLogin").textContent="Accedi"; return; }
+      if (res.error) { err.textContent=res.error; document.getElementById("btnSidebarLogin").textContent=t("sidebar.btn_login"); return; }
       // onAuthStateChanged handles re-render
     });
     document.getElementById("sidebarPwd")?.addEventListener("keydown", e => {
       if(e.key==="Enter") document.getElementById("btnSidebarLogin")?.click();
-    });
-
-    document.getElementById("btnForgotPwd")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("sidebarEmail").value.trim();
-      const err   = document.getElementById("sidebarLoginErr");
-      if (!email) {
-        err.style.color = "var(--accent)";
-        err.textContent = "Inserisci prima la tua email qui sopra.";
-        return;
-      }
-      try {
-        const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
-        await sendPasswordResetEmail(window._fbAuth, email);
-        err.style.color = "var(--green)";
-        err.textContent = "✅ Email di reset inviata! Controlla la casella (anche spam).";
-      } catch(ex) {
-        err.style.color = "var(--red)";
-        err.textContent = ex.code === "auth/user-not-found"
-          ? "❌ Nessun account trovato con questa email."
-          : "❌ Errore nell'invio. Riprova.";
-      }
     });
 
     document.getElementById("btnSidebarRegister")?.addEventListener("click", async () => {
@@ -2076,13 +3144,13 @@ function renderHomeButtons() {
   if (!btnsWrap) return;
   if (currentUser) {
     btnsWrap.innerHTML = `
-      <button class="btn-primary" onclick="toggleSidebar()">🏆 Le mie Leghe</button>
-      <button class="btn-primary" onclick="renderHomeCreateForm()">➕ Crea Lega</button>
-      <button class="btn-sec" onclick="renderHomeJoinForm()">🔗 Unisciti a una Lega</button>`;
+      <button class="btn-primary" onclick="toggleSidebar()">${t("sidebar.my_leagues")}</button>
+      <button class="btn-primary" onclick="renderHomeCreateForm()">${t("sidebar.create_league")}</button>
+      <button class="btn-sec" onclick="renderHomeJoinForm()">${t("sidebar.join_league")}</button>`;
   } else {
     btnsWrap.innerHTML = `
-      <button class="btn-primary" onclick="toggleSidebar()">Accedi</button>
-      <button class="btn-sec" onclick="toggleSidebarRegister()">Registrati</button>`;
+      <button class="btn-primary" onclick="toggleSidebar()">${t("hero.login")}</button>
+      <button class="btn-sec" onclick="toggleSidebarRegister()">${t("hero.register")}</button>`;
   }
 }
 
@@ -2212,11 +3280,21 @@ function renderHomeCreateForm() {
       if (result) {
         const {legaId,meta} = result;
         const link = `${location.origin}${location.pathname}?lega=${legaId}`;
+        const waMsg = encodeURIComponent(`🏆 Ho creato la lega "${nome}" su ArenaSerieA per la Serie A 2026/27!\nEntra qui 👉 ${link}`);
         res.style.color="var(--green)";
-        res.innerHTML=`✓ Creata! <strong>${legaId}</strong>
-          <button class="btn-sec" style="font-size:10px;padding:2px 7px;margin-left:6px"
-            onclick="navigator.clipboard.writeText('${link}').then(()=>toast('Copiato!'))">📋</button>`;
-        setTimeout(()=>{ closeSidebar(); entraInLega(legaId, defaultLegaState(), meta); }, 1200);
+        res.innerHTML=`
+          <div style="margin-bottom:8px">✓ Lega <strong>${legaId}</strong> creata!</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Condividi il link con i tuoi amici:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-sec" style="font-size:11px;padding:4px 10px"
+              onclick="navigator.clipboard.writeText('${link}').then(()=>toast('📋 Link copiato!'))">📋 Copia link</button>
+            <a href="https://wa.me/?text=${waMsg}" target="_blank" rel="noopener"
+              style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:11px;padding:4px 10px;cursor:pointer;text-decoration:none;font-weight:600">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.529 5.855L.057 23.882l6.198-1.625A11.935 11.935 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.504-5.186-1.385l-.372-.22-3.679.965.98-3.585-.242-.379A9.943 9.943 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              WhatsApp
+            </a>
+          </div>`;
+        setTimeout(()=>{ closeSidebar(); entraInLega(legaId, defaultLegaState(), meta); }, 3000);
       }
     });
 
@@ -2242,9 +3320,11 @@ function renderHomeCreateForm() {
 function exitLega() {
   currentLegaId = null; currentLegaMeta = null;
   state = defaultLegaState();
+  if (_playerRoseUnsubscribe) { _playerRoseUnsubscribe(); _playerRoseUnsubscribe = null; }
+  _playerRoseState = {};
   adminUnlocked = false; votiUnlocked = false; superadminUnlocked = false;
   aggiornaTabAdmin();
-  localStorage.removeItem("fsa_lastLega"); localStorage.removeItem("fsa_lastLegaMeta");
+  localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
   history.pushState(null, '', location.pathname);
   // Hide nav tabs (keep logo and sidebar btn)
   document.querySelector(".nav-links")?.style && (document.querySelector(".nav-links").style.display="none");
@@ -2290,6 +3370,15 @@ async function signOut() {
   if (!window._fbAuth) return;
   const { signOut: fbSignOut } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
   await fbSignOut(window._fbAuth);
+}
+
+async function resetPassword(email) {
+  if (!window._fbAuth) return { error: "Firebase Auth non disponibile" };
+  try {
+    const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    await sendPasswordResetEmail(window._fbAuth, email);
+    return { ok: true };
+  } catch(e) { return { error: translateAuthError(e.code) }; }
 }
 
 function translateAuthError(code) {
@@ -2338,9 +3427,7 @@ function renderSuperadminPage() {
         <h3>📅 Giornata Corrente</h3>
         <p class="hint">Impostata per tutte le leghe.</p>
         <div class="field-group"><label>Giornata</label>
-          <select id="superGiornata">
-            <option value="1">Giornata 1</option> <option value="2">Giornata 2</option> <option value="3">Giornata 3</option> <option value="4">Giornata 4</option> <option value="5">Giornata 5</option> <option value="6">Giornata 6</option> <option value="7">Giornata 7</option> <option value="8">Giornata 8</option> <option value="9">Giornata 9</option> <option value="10">Giornata 10</option> <option value="11">Giornata 11</option> <option value="12">Giornata 12</option> <option value="13">Giornata 13</option> <option value="14">Giornata 14</option> <option value="15">Giornata 15</option> <option value="16">Giornata 16</option> <option value="17">Giornata 17</option> <option value="18">Giornata 18</option> <option value="19">Giornata 19</option> <option value="20">Giornata 20</option> <option value="21">Giornata 21</option> <option value="22">Giornata 22</option> <option value="23">Giornata 23</option> <option value="24">Giornata 24</option> <option value="25">Giornata 25</option> <option value="26">Giornata 26</option> <option value="27">Giornata 27</option> <option value="28">Giornata 28</option> <option value="29">Giornata 29</option> <option value="30">Giornata 30</option> <option value="31">Giornata 31</option> <option value="32">Giornata 32</option> <option value="33">Giornata 33</option> <option value="34">Giornata 34</option> <option value="35">Giornata 35</option> <option value="36">Giornata 36</option> <option value="37">Giornata 37</option> <option value="38">Giornata 38</option>
-          </select>
+          <select id="superGiornata">${giornateOptions()}</select>
         </div>
         <button class="btn-primary" id="btnSuperSalvaGiornata">💾 Salva</button>
       </div>
@@ -2365,6 +3452,7 @@ function renderSuperadminPage() {
         </div>
         <button class="btn-primary" id="btnSuperCaricaGiocatori" disabled>⬆️ Carica nel Database</button>
         <button class="btn-sec" id="btnSuperSvuotaGiocatori" style="margin-left:8px;color:var(--red);border-color:var(--red)">🗑 Svuota Database</button>
+        <button class="btn-sec" id="btnSuperFixNazioni" style="margin-left:8px">🔧 Fix nomi nazioni</button>
         <p class="parse-result" id="superGiocatoriResult" style="margin-top:10px"></p>
         <div id="superGiocatoriPreview" style="margin-top:12px"></div>
       </div>
@@ -2373,9 +3461,7 @@ function renderSuperadminPage() {
         <p class="hint">Il poller aggiorna i voti automaticamente ogni 5 minuti durante le partite. Qui puoi vedere lo stato e forzare un aggiornamento manuale per singola partita.</p>
         <div class="field-group" style="margin-bottom:12px">
           <label>Giornata</label>
-          <select id="superLiveGiornata">
-            <option value="1">Giornata 1</option> <option value="2">Giornata 2</option> <option value="3">Giornata 3</option> <option value="4">Giornata 4</option> <option value="5">Giornata 5</option> <option value="6">Giornata 6</option> <option value="7">Giornata 7</option> <option value="8">Giornata 8</option> <option value="9">Giornata 9</option> <option value="10">Giornata 10</option> <option value="11">Giornata 11</option> <option value="12">Giornata 12</option> <option value="13">Giornata 13</option> <option value="14">Giornata 14</option> <option value="15">Giornata 15</option> <option value="16">Giornata 16</option> <option value="17">Giornata 17</option> <option value="18">Giornata 18</option> <option value="19">Giornata 19</option> <option value="20">Giornata 20</option> <option value="21">Giornata 21</option> <option value="22">Giornata 22</option> <option value="23">Giornata 23</option> <option value="24">Giornata 24</option> <option value="25">Giornata 25</option> <option value="26">Giornata 26</option> <option value="27">Giornata 27</option> <option value="28">Giornata 28</option> <option value="29">Giornata 29</option> <option value="30">Giornata 30</option> <option value="31">Giornata 31</option> <option value="32">Giornata 32</option> <option value="33">Giornata 33</option> <option value="34">Giornata 34</option> <option value="35">Giornata 35</option> <option value="36">Giornata 36</option> <option value="37">Giornata 37</option> <option value="38">Giornata 38</option>
-          </select>
+          <select id="superLiveGiornata">${giornateOptions()}</select>
         </div>
         <div id="superMatchList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:8px"></div>
         <p class="hint" id="superLiveEmpty" style="display:none">Nessuna partita configurata per questa giornata.</p>
@@ -2386,13 +3472,52 @@ function renderSuperadminPage() {
         <div class="voti-controls" style="margin-bottom:16px">
           <div class="filter-item"><label>Squadra</label><select id="superSelectSquadra"></select></div>
           <div class="filter-item"><label>Giornata</label>
-            <select id="superSelectGiornata">
-              <option value="1">G1</option><option value="2">G2</option><option value="3">G3</option><option value="4">G4</option><option value="5">G5</option><option value="6">G6</option><option value="7">G7</option><option value="8">G8</option><option value="9">G9</option><option value="10">G10</option><option value="11">G11</option><option value="12">G12</option><option value="13">G13</option><option value="14">G14</option><option value="15">G15</option><option value="16">G16</option><option value="17">G17</option><option value="18">G18</option><option value="19">G19</option><option value="20">G20</option><option value="21">G21</option><option value="22">G22</option><option value="23">G23</option><option value="24">G24</option><option value="25">G25</option><option value="26">G26</option><option value="27">G27</option><option value="28">G28</option><option value="29">G29</option><option value="30">G30</option><option value="31">G31</option><option value="32">G32</option><option value="33">G33</option><option value="34">G34</option><option value="35">G35</option><option value="36">G36</option><option value="37">G37</option><option value="38">G38</option>
-            </select>
+            <select id="superSelectGiornata">${giornateOptions()}</select>
           </div>
           <button class="btn-primary" id="superBtnSalvaVoti">💾 Salva</button>
         </div>
         <div id="superVotiTable" class="voti-table-wrap"></div>
+      </div>
+      <div class="admin-card" style="grid-column:1/-1">
+        <h3>🚫 Club Eliminati</h3>
+        <p class="hint">Segna i club usciti dalla competizione. I loro giocatori appariranno barrati nelle rose e non potranno ricevere nuovi voti.</p>
+        <div id="superEliminateGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:12px"></div>
+        <button class="btn-primary" id="btnSuperSalvaEliminate" style="margin-top:16px">💾 Salva Eliminazioni</button>
+      </div>
+      <div class="admin-card" style="grid-column:1/-1">
+        <h3>🔄 Migrazione Nomi Rose</h3>
+        <p class="hint">Allinea i nomi dei giocatori in tutte le rose al database giocatori aggiornato. Usa questa funzione dopo aver ricaricato il CSV con i nomi corretti.</p>
+        <button class="btn-primary" id="btnMigraNomiRose">🔄 Migra nomi rose</button>
+        <p id="migraNomiRoseResult" style="margin-top:10px;font-size:13px"></p>
+      </div>
+
+      <div class="admin-card" style="grid-column:1/-1">
+        <h3>🔤 Alias Nomi Sofascore</h3>
+        <p class="hint">Mappa nomi Sofascore non riconosciuti al giocatore corretto nel database. Il poller li usa in automatico.</p>
+
+        <button class="btn-sec" id="btnRilevaOrfani">🔍 Rileva nomi non risolti</button>
+        <div id="aliasOrfaniList" style="margin-top:12px"></div>
+
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+          <h4 style="margin:0 0 10px;font-size:14px;font-weight:700">Aggiungi alias manuale</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field-group" style="flex:0 0 auto">
+              <label>Club</label>
+              <select id="aliasNazione"><option value="">– Club –</option>${(typeof SQUADRE !== "undefined" ? SQUADRE : []).map(n=>`<option value="${n}">${n}</option>`).join("")}</select>
+            </div>
+            <div class="field-group" style="flex:1;min-width:140px">
+              <label>Nome Sofascore</label>
+              <input type="text" id="aliasSofaName" placeholder="es. Y. Bounou" style="width:100%;box-sizing:border-box">
+            </div>
+            <div class="field-group" style="flex:1;min-width:140px">
+              <label>Giocatore nel DB</label>
+              <select id="aliasDbName" disabled><option value="">– prima seleziona nazione –</option></select>
+            </div>
+            <button class="btn-primary" id="btnSalvaAlias">💾 Salva</button>
+          </div>
+        </div>
+
+        <div id="aliasEsistenti" style="margin-top:16px"></div>
       </div>
     </div>`;
 
@@ -2414,8 +3539,8 @@ function renderSuperadminPage() {
     if (!confirm("Eliminare TUTTE le leghe?")) return;
     if (!window._fbReady || !window._db) return;
     await window._set(window._ref(window._db, "leghe"), null);
-    Object.keys(localStorage).filter(k => k.startsWith("fsa_lega_")).forEach(k => localStorage.removeItem(k));
-    localStorage.removeItem("fsa_lastLega"); localStorage.removeItem("fsa_lastLegaMeta");
+    Object.keys(localStorage).filter(k => k.startsWith("ucl_lega_")).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
     toast("Leghe eliminate."); renderSuperadminPage();
   });
   document.getElementById("btnDelAll")?.addEventListener("click", async () => {
@@ -2427,11 +3552,176 @@ function renderSuperadminPage() {
 
   const sel = document.getElementById("superSelectSquadra");
   let opts = '<option value="">– Seleziona –</option>';
-  for (const n of NAZIONALI) opts += `<option value="${n}">${n}</option>`;
+  const squadreList = typeof SQUADRE !== "undefined" ? SQUADRE : [];
+  for (const n of squadreList) opts += `<option value="${n}">${n}</option>`;
   sel.innerHTML = opts;
   sel.addEventListener("change", renderSuperVotiTable);
   document.getElementById("superSelectGiornata")?.addEventListener("change", renderSuperVotiTable);
   document.getElementById("superBtnSalvaVoti")?.addEventListener("click", saveSuperVoti);
+
+  // ── CLUB ELIMINATI ──────────────────────────────────────────
+  const elimGrid = document.getElementById("superEliminateGrid");
+  if (elimGrid) {
+    const eliminate = globalState.clubEliminati || {};
+    const ELIM_OPZIONI = [
+      { value: "",   label: "— Ancora in corsa —" },
+      { value: "8",  label: "League Phase (out dopo G8)" },
+      { value: "10", label: "Playoff (out dopo PO-R)" },
+      { value: "12", label: "Ottavi (out dopo R16-R)" },
+      { value: "14", label: "Quarti (out dopo QF-R)" },
+      { value: "16", label: "Semifinale (out dopo SF-R)" },
+    ];
+    const optsHtml = ELIM_OPZIONI.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+    let gridHtml = "";
+    const clubList = typeof SQUADRE !== "undefined" ? SQUADRE : [];
+    for (const club of clubList) {
+      const val = eliminate[club] || "";
+      const isElim = !!val;
+      gridHtml += `<div class="elim-check-label${isElim ? " elim-active" : ""}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid ${isElim ? "var(--red)" : "var(--border)"};background:${isElim ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.03)"};border-radius:8px;font-size:13px;transition:all .15s">
+        <span style="flex:1;${isElim ? "text-decoration:line-through;opacity:.6" : ""}">${club}</span>
+        <select class="elim-sel" data-club="${club}" style="font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:2px 4px">
+          ${optsHtml}
+        </select>
+      </div>`;
+    }
+    elimGrid.innerHTML = gridHtml;
+    // Set current values and bind change styling
+    elimGrid.querySelectorAll("select.elim-sel").forEach(sel => {
+      sel.value = eliminate[sel.dataset.club] || "";
+      sel.addEventListener("change", function() {
+        const row = this.closest("div");
+        const nameSpan = row.querySelector("span");
+        const isElim = !!this.value;
+        row.style.borderColor = isElim ? "var(--red)" : "var(--border)";
+        row.style.background  = isElim ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.03)";
+        if (nameSpan) { nameSpan.style.textDecoration = isElim ? "line-through" : ""; nameSpan.style.opacity = isElim ? ".6" : ""; }
+      });
+    });
+    document.getElementById("btnSuperSalvaEliminate")?.addEventListener("click", () => {
+      const newElim = {};
+      elimGrid.querySelectorAll("select.elim-sel").forEach(sel => {
+        if (sel.value) newElim[sel.dataset.club] = sel.value;
+      });
+      globalState.clubEliminati = newElim;
+      saveGlobalState();
+      toast(`✓ ${Object.keys(newElim).length} club segnati come eliminati`);
+    });
+  }
+
+  document.getElementById("btnMigraNomiRose")?.addEventListener("click", migraNomiRose);
+
+  // ── ALIAS NOMI SOFASCORE ─────────────────────────────────────
+  {
+    const aliasNazioneEl  = document.getElementById("aliasNazione");
+    const aliasSofaNameEl = document.getElementById("aliasSofaName");
+    const aliasDbNameEl   = document.getElementById("aliasDbName");
+    const aliasOrfaniList = document.getElementById("aliasOrfaniList");
+    const aliasEsistentiEl = document.getElementById("aliasEsistenti");
+
+    function fbOnceAlias(path) {
+      return new Promise(res => window._onVal(window._ref(window._db, path), snap => res(snap), { onlyOnce: true }));
+    }
+
+    async function renderAliasEsistenti() {
+      const snap = await fbOnceAlias("global/playerAliases");
+      const aliases = snap.val() || {};
+      const rows = Object.entries(aliases).flatMap(([naz, entries]) =>
+        Object.entries(entries).map(([key, dbName]) => ({ naz, key, dbName }))
+      );
+      if (!rows.length) {
+        aliasEsistentiEl.innerHTML = `<p class="hint" style="margin:0">Nessun alias presente.</p>`;
+        return;
+      }
+      aliasEsistentiEl.innerHTML = `
+        <h4 style="margin:0 0 8px;font-size:14px;font-weight:700">Alias esistenti (${rows.length})</h4>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          ${rows.map(r => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:13px;flex-wrap:wrap">
+              <span style="color:var(--text2);min-width:80px">${r.naz}</span>
+              <span style="color:var(--accent2);font-weight:600">${r.key}</span>
+              <span style="color:var(--text2)">→</span>
+              <span style="color:var(--accent);font-weight:600;flex:1">${r.dbName}</span>
+              <button class="btn-sec alias-del" data-naz="${r.naz}" data-key="${r.key}" style="padding:2px 8px;font-size:11px;color:var(--accent2);border-color:var(--accent2)">✕</button>
+            </div>`
+          ).join("")}
+        </div>`;
+      aliasEsistentiEl.querySelectorAll(".alias-del").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(`Eliminare alias "${btn.dataset.key}"?`)) return;
+          await window._set(window._ref(window._db, `global/playerAliases/${btn.dataset.naz}/${btn.dataset.key}`), null);
+          toast("Alias eliminato.");
+          renderAliasEsistenti();
+        });
+      });
+    }
+    renderAliasEsistenti();
+
+    aliasNazioneEl?.addEventListener("change", () => {
+      const naz = aliasNazioneEl.value;
+      if (!naz) { aliasDbNameEl.innerHTML = `<option value="">– prima seleziona nazione –</option>`; aliasDbNameEl.disabled = true; return; }
+      const players = (globalState.giocatoriSquadra?.[naz] || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+      aliasDbNameEl.innerHTML = `<option value="">– Giocatore –</option>` + players.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("");
+      aliasDbNameEl.disabled = false;
+    });
+
+    document.getElementById("btnSalvaAlias")?.addEventListener("click", async () => {
+      const naz     = aliasNazioneEl?.value;
+      const sofaN   = aliasSofaNameEl?.value.trim();
+      const dbName  = aliasDbNameEl?.value;
+      if (!naz || !sofaN || !dbName) { toast("Compila tutti i campi.", true); return; }
+      await window._set(window._ref(window._db, `global/playerAliases/${naz}/${safeKey(sofaN)}`), dbName);
+      toast(`✅ "${sofaN}" → "${dbName}" (${naz})`);
+      aliasSofaNameEl.value = "";
+      aliasDbNameEl.value = "";
+      renderAliasEsistenti();
+    });
+
+    document.getElementById("btnRilevaOrfani")?.addEventListener("click", () => {
+      const seen = new Map();
+      for (const [naz, giornate] of Object.entries(globalState.voti || {})) {
+        const knownKeys = new Set((globalState.giocatoriSquadra?.[naz] || []).map(g => safeKey(g.nome)));
+        for (const [gId, giocatori] of Object.entries(giornate || {})) {
+          for (const [key, entry] of Object.entries(giocatori || {})) {
+            if (!knownKeys.has(key) && entry?.v !== undefined) {
+              const mk = `${naz}||${key}`;
+              if (!seen.has(mk)) seen.set(mk, { naz, key, v: entry.v, giornate: [] });
+              seen.get(mk).giornate.push(`G${gId}`);
+            }
+          }
+        }
+      }
+      if (!seen.size) {
+        aliasOrfaniList.innerHTML = `<p class="hint" style="margin:0">✅ Nessun nome non risolto trovato.</p>`;
+        return;
+      }
+      aliasOrfaniList.innerHTML = [...seen.values()].map(o => {
+        const playerOpts = (globalState.giocatoriSquadra?.[o.naz] || [])
+          .slice().sort((a, b) => a.nome.localeCompare(b.nome))
+          .map(p => `<option value="${p.nome}">${p.nome}</option>`).join("");
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px;background:rgba(255,100,0,.08);border:1px solid rgba(255,100,0,.2);border-radius:8px;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--text2)">${o.naz} ${o.giornate.join(" ")}</span>
+          <span style="font-weight:700;color:var(--accent2)">${o.key}</span>
+          <span style="font-size:12px;color:var(--text2)">voto: ${o.v}</span>
+          <select class="orfano-sel" data-naz="${o.naz}" data-key="${o.key}" style="flex:1;min-width:140px">
+            <option value="">– mappa a –</option>${playerOpts}
+          </select>
+          <button class="btn-primary orfano-save" data-naz="${o.naz}" data-key="${o.key}" style="font-size:12px;padding:5px 10px">💾 Salva</button>
+        </div>`;
+      }).join("");
+
+      aliasOrfaniList.querySelectorAll(".orfano-save").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const sel = aliasOrfaniList.querySelector(`.orfano-sel[data-naz="${btn.dataset.naz}"][data-key="${btn.dataset.key}"]`);
+          if (!sel?.value) { toast("Seleziona un giocatore.", true); return; }
+          await window._set(window._ref(window._db, `global/playerAliases/${btn.dataset.naz}/${btn.dataset.key}`), sel.value);
+          toast(`✅ "${btn.dataset.key}" → "${sel.value}"`);
+          btn.closest("div").style.opacity = "0.35";
+          btn.disabled = true;
+          renderAliasEsistenti();
+        });
+      });
+    });
+  }
 
   // ── LIVE PARTITE ─────────────────────────────────────────────
   renderSuperMatchList(globalState.giornataCorrente || "1");
@@ -2446,9 +3736,9 @@ function renderSuperadminPage() {
     const file = this.files[0];
     if (!file) return;
     document.getElementById("superGiocatoriFileName").textContent = file.name;
-
-    function processCSV(text) {
-      const result = parseSuperGiocatoriCSV(text);
+    const reader = new FileReader();
+    reader.onload = e => {
+      const result = parseSuperGiocatoriCSV(e.target.result);
       const resEl = document.getElementById("superGiocatoriResult");
       const previewEl = document.getElementById("superGiocatoriPreview");
       const btnCarica = document.getElementById("btnSuperCaricaGiocatori");
@@ -2466,6 +3756,7 @@ function renderSuperadminPage() {
       resEl.style.color = "var(--green)";
       resEl.textContent = `✓ ${nGioc} giocatori in ${nSquadre} squadre – pronti per il caricamento.`;
       btnCarica.disabled = false;
+      // Mostra anteprima
       previewEl.innerHTML = `<details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Mostra anteprima (prime 5 squadre)</summary>
         <div style="font-size:12px;margin-top:8px;max-height:260px;overflow:auto">
@@ -2474,23 +3765,8 @@ function renderSuperadminPage() {
           ).join('<br>')}
         </div>
       </details>`;
-    }
-
-    // Prova UTF-8 prima, poi Latin-1 come fallback per file Excel ANSI
-    const readerUtf8 = new FileReader();
-    readerUtf8.onload = e => {
-      const text = e.target.result;
-      // Controlla se ci sono caratteri di sostituzione UTF-8 (segno di encoding errato)
-      if (text.includes('\uFFFD') || /[\x80-\x9F]/.test(text)) {
-        // Rileggi in Latin-1
-        const readerLatin = new FileReader();
-        readerLatin.onload = e2 => processCSV(e2.target.result);
-        readerLatin.readAsText(file, "ISO-8859-1");
-      } else {
-        processCSV(text);
-      }
     };
-    readerUtf8.readAsText(file, "UTF-8");
+    reader.readAsText(file);
   });
 
   document.getElementById("btnSuperCaricaGiocatori")?.addEventListener("click", async () => {
@@ -2500,16 +3776,11 @@ function renderSuperadminPage() {
     btn.disabled = true; btn.textContent = "⏳ Caricamento...";
     try {
       globalState.giocatoriSquadra = _giocatoriParsed;
-      // Salva in global/giocatori — path dedicato condiviso tra tutte le leghe
-      saveGiocatoriToFirebase();
-      try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
-      const nGioc = Object.values(_giocatoriParsed).flat().length;
-      const nSq   = Object.keys(_giocatoriParsed).length;
+      saveGlobalState();
       resEl.style.color = "var(--green)";
-      resEl.textContent = `✅ Database caricato! ${nGioc} giocatori in ${nSq} squadre. Visibile a tutte le leghe.`;
+      resEl.textContent = `✅ Database caricato! ${Object.values(_giocatoriParsed).flat().length} giocatori in ${Object.keys(_giocatoriParsed).length} squadre.`;
       toast("Database giocatori aggiornato!");
       btn.textContent = "⬆️ Carica nel Database";
-      btn.disabled = false;
     } catch(e) {
       resEl.style.color = "var(--red)";
       resEl.textContent = "❌ Errore: " + e.message;
@@ -2520,8 +3791,7 @@ function renderSuperadminPage() {
   document.getElementById("btnSuperSvuotaGiocatori")?.addEventListener("click", async () => {
     if (!confirm("Svuotare il database dei giocatori? Questa azione è irreversibile.")) return;
     globalState.giocatoriSquadra = {};
-    saveGiocatoriToFirebase();
-    try{localStorage.setItem("fsa_global",JSON.stringify(globalState));}catch(e){}
+    saveGlobalState();
     const resEl = document.getElementById("superGiocatoriResult");
     resEl.style.color = "var(--orange)";
     resEl.textContent = "Database giocatori svuotato.";
@@ -2530,6 +3800,23 @@ function renderSuperadminPage() {
     document.getElementById("btnSuperCaricaGiocatori").disabled = true;
     _giocatoriParsed = null;
     toast("Database giocatori svuotato.");
+  });
+
+  document.getElementById("btnSuperFixNazioni")?.addEventListener("click", async () => {
+    const resEl = document.getElementById("superGiocatoriResult");
+    const gs = globalState.giocatoriSquadra || {};
+    const aliasKeys = Object.keys(NAZIONE_ALIASES).filter(a => gs[a]);
+    if (!aliasKeys.length) {
+      resEl.style.color = "var(--text2)";
+      resEl.textContent = "✅ Nessun alias da correggere nel database.";
+      return;
+    }
+    normalizeGiocatoriSquadra(gs);
+    globalState.giocatoriSquadra = gs;
+    saveGlobalState();
+    resEl.style.color = "var(--green)";
+    resEl.textContent = "✅ Corretti: " + aliasKeys.join(", ") + " → nomi canonici.";
+    toast("Fix nomi nazioni completato!");
   });
 
   // Mostra stato attuale del database
@@ -2549,10 +3836,10 @@ function getMatchStatus(kickoffISO) {
   const ko  = new Date(kickoffISO).getTime();
   const end = ko + 130 * 60 * 1000; // 130 min finestra
   const finalized = ko + 180 * 60 * 1000; // 3h dopo = dati stabili
-  if (now < ko)        return { label: "In programma", cls: "match-status-upcoming", icon: "🕐" };
-  if (now <= end)      return { label: "IN CORSO 🔴",  cls: "match-status-live",     icon: "🔴" };
-  if (now <= finalized)return { label: "Appena finita",cls: "match-status-recent",   icon: "✅" };
-  return                      { label: "Conclusa",     cls: "match-status-done",     icon: "✔️" };
+  if (now < ko)        return { label: t("match_status.upcoming"), cls: "match-status-upcoming", icon: "🕐" };
+  if (now <= end)      return { label: t("match_status.live"),     cls: "match-status-live",     icon: "🔴" };
+  if (now <= finalized)return { label: t("match_status.recent"),   cls: "match-status-recent",   icon: "✅" };
+  return                      { label: t("match_status.done"),     cls: "match-status-done",     icon: "✔️" };
 }
 
 function formatKickoff(kickoffISO) {
@@ -2643,7 +3930,7 @@ async function importFromSofascore(eventId, home, away, gId, btnEl) {
   btnEl.textContent = "⏳ Importo...";
 
   try {
-    const res = await fetch(`/.netlify/functions/sofascore-proxy?eventId=${eventId}`);
+    const res = await fetch(`.netlify/functions/sofascore-proxy?eventId=${eventId}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
@@ -2657,16 +3944,27 @@ async function importFromSofascore(eventId, home, away, gId, btnEl) {
       if (!globalState.voti[nazione]) globalState.voti[nazione] = {};
       if (!globalState.voti[nazione][gId]) globalState.voti[nazione][gId] = {};
       for (const p of players) {
-        const existing = globalState.voti[nazione][gId][p.name] || {};
+        const key = safeKey(p.name);
+        const existing = globalState.voti[nazione][gId][key] || {};
         // Preserva modifiche manuali ai flags se già presenti
         const flagsDaUsare = (existing.source === "sofascore" && existing.flags && Object.keys(existing.flags).length > 0)
           ? existing.flags
           : (p.flags || {});
         if (p.didNotPlay || (p.minutesPlayed === 0 && p.rating === null)) {
-          globalState.voti[nazione][gId][p.name] = { sv: true, flags: flagsDaUsare, source: "sofascore" };
+          globalState.voti[nazione][gId][key] = { sv: true, flags: flagsDaUsare, source: "sofascore" };
         } else if (p.rating !== null) {
-          globalState.voti[nazione][gId][p.name] = { v: p.rating, sv: false, flags: flagsDaUsare, source: "sofascore" };
+          globalState.voti[nazione][gId][key] = { v: p.rating, sv: false, flags: flagsDaUsare, source: "sofascore" };
           if (side === "home") countHome++; else countAway++;
+        }
+      }
+      // Giocatori assenti dalla formazione (infortunati, non convocati) → SV
+      if (players.length > 0) {
+        for (const g of (globalState.giocatoriSquadra?.[nazione] || [])) {
+          if (!g?.nome) continue;
+          const key = safeKey(g.nome);
+          if (!globalState.voti[nazione][gId][key]) {
+            globalState.voti[nazione][gId][key] = { sv: true, source: "sofascore" };
+          }
         }
       }
     }
@@ -2682,11 +3980,42 @@ async function importFromSofascore(eventId, home, away, gId, btnEl) {
   }
 }
 
+async function migraNomiRose() {
+  const btn = document.getElementById("btnMigraNomiRose");
+  const resultEl = document.getElementById("migraNomiRoseResult");
+  if (!confirm("Migrare i nomi nelle rose di tutte le leghe?\nL'operazione è reversibile solo manualmente.")) return;
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Migrazione in corso...";
+  if (resultEl) resultEl.textContent = "";
+
+  try {
+    const res = await fetch(".netlify/functions/migrate-rose", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const msg = `✅ ${data.totalUpdated} nomi aggiornati su ${data.totalChecked} giocatori controllati.`;
+    toast(msg);
+    if (resultEl) resultEl.textContent = msg;
+  } catch (err) {
+    console.error("migraNomiRose:", err);
+    toast("Errore migrazione: " + err.message, true);
+    if (resultEl) resultEl.textContent = "❌ Errore: " + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔄 Migra nomi rose";
+  }
+}
+
 function renderSuperVotiTable() {
   const naz = document.getElementById("superSelectSquadra")?.value;
   const gId = document.getElementById("superSelectGiornata")?.value;
   const wrap = document.getElementById("superVotiTable"); if (!wrap) return;
   if (!naz) { wrap.innerHTML = '<div class="empty-state"><p>Seleziona una squadra.</p></div>'; return; }
+  if (isNazioneEliminata(naz, gId)) {
+    wrap.insertAdjacentHTML("beforebegin", `<div id="superElimBanner" style="background:rgba(239,68,68,.12);border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fca5a5">🚫 <strong>${naz}</strong> è eliminata — i voti sono bloccati per gli admin lega. Qui puoi comunque fare correzioni.</div>`);
+  } else {
+    document.getElementById("superElimBanner")?.remove();
+  }
   const giocSet = new Map();
   for (const g of (globalState.giocatoriSquadra?.[naz] || [])) if (!giocSet.has(g.nome)) giocSet.set(g.nome, g);
   const giocatori = Array.from(giocSet.values()).sort((a, b) => {
@@ -2701,7 +4030,7 @@ function renderSuperVotiTable() {
     if (!globalState.voti[naz][gId][nome].flags) globalState.voti[naz][gId][nome].flags = {};
   }
   const rows = giocatori.map(g => {
-    const entry = savedVoti[g.nome] || {};
+    const entry = savedVoti[safeKey(g.nome)] || {};
     const isSV = !!entry.sv; const v = entry.v !== undefined ? entry.v : "";
     const flags = entry.flags || {}; const bns = calcFlagsBonus(flags, g.ruolo);
     const tot = isSV ? 0 : (parseFloat(v) || 0) + bns;
@@ -2709,10 +4038,10 @@ function renderSuperVotiTable() {
     const fd = getFlagsForRuolo(g.ruolo);
     const fh = fd.map(f => {
       const val = flags[f.key];
-      if (f.multi) { const cnt = val || 0; return `<span class="flag-multi-wrap ${f.cls}${cnt > 0 ? " active" : ""}" data-flag="${f.key}" data-nome="${g.nome}"><button class="flag-multi-dec" data-flag="${f.key}" data-nome="${g.nome}" ${cnt === 0 ? "disabled" : ""}>−</button><span class="flag-multi-label">${f.label.split(" ")[0]} <span class="flag-multi-count">${cnt}</span></span><button class="flag-multi-inc" data-flag="${f.key}" data-nome="${g.nome}">+</button></span>`; }
-      return `<button class="flag-btn ${f.cls}${val ? " active" : ""}" data-flag="${f.key}" data-multi="false" data-nome="${g.nome}">${f.label}</button>`;
+      if (f.multi) { const cnt = val || 0; return `<span class="flag-multi-wrap ${f.cls}${cnt > 0 ? " active" : ""}" data-flag="${f.key}" data-nome="${safeKey(g.nome)}"><button class="flag-multi-dec" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" ${cnt === 0 ? "disabled" : ""}>−</button><span class="flag-multi-label">${f.label.split(" ")[0]} <span class="flag-multi-count">${cnt}</span></span><button class="flag-multi-inc" data-flag="${f.key}" data-nome="${safeKey(g.nome)}">+</button></span>`; }
+      return `<button class="flag-btn ${f.cls}${val ? " active" : ""}" data-flag="${f.key}" data-multi="false" data-nome="${safeKey(g.nome)}">${f.label}</button>`;
     }).join("");
-    return `<tr data-nome="${g.nome}" data-ruolo="${g.ruolo}"><td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td><td style="font-weight:600">${fromSofa ? '<span title="Voto Sofascore" style="font-size:10px;margin-right:4px">🔴</span>' : ""}${g.nome}</td><td class="center"><input type="number" class="inp-v" data-nome="${g.nome}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV ? "disabled style='opacity:.4'" : ""}><button class="sv-btn${isSV ? " active" : ""}" data-nome="${g.nome}">SV</button></td><td><div class="flags-wrap">${fh}</div></td><td class="center"><span class="totale-voto-cell${tot < 0 ? " totale-voto-neg" : ""}" id="svtot_${safeId(g.nome)}">${isSV ? "SV" : v !== "" ? tot.toFixed(1) : "–"}</span></td><td class="center"><button class="btn-icon" data-svdel="${g.nome}" style="color:var(--orange)">✕</button></td></tr>`;
+    return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"><td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td><td style="font-weight:600">${fromSofa ? '<span title="Voto Sofascore" style="font-size:10px;margin-right:4px">🔴</span>' : ""}${g.nome}</td><td class="center"><input type="number" class="inp-v" data-nome="${safeKey(g.nome)}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV ? "disabled style='opacity:.4'" : ""}><button class="sv-btn${isSV ? " active" : ""}" data-nome="${safeKey(g.nome)}">SV</button></td><td><div class="flags-wrap">${fh}</div></td><td class="center"><span class="totale-voto-cell${tot < 0 ? " totale-voto-neg" : ""}" id="svtot_${safeId(g.nome)}">${isSV ? "SV" : v !== "" ? tot.toFixed(1) : "–"}</span></td><td class="center"><button class="btn-icon" data-svdel="${safeKey(g.nome)}" style="color:var(--orange)">✕</button></td></tr>`;
   }).join("");
   wrap.innerHTML = `<table class="voti-table"><thead><tr><th>R.</th><th>Giocatore</th><th class="center">Voto</th><th>Bonus/Malus</th><th class="center">Tot</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   function updTot(row) {
@@ -2851,15 +4180,15 @@ function aggiornaTabAdmin() {
 function entraInLega(legaId, legaState, legaMeta) {
   currentLegaId = legaId; currentLegaMeta = legaMeta || null;
   state = sanitizeLegaState(legaState);
-  localStorage.setItem("fsa_lega_" + legaId, JSON.stringify(state));
-  localStorage.setItem("fsa_lastLega", legaId);
-  if (legaMeta) localStorage.setItem("fsa_lastLegaMeta", JSON.stringify(legaMeta));
+  localStorage.setItem("ucl_lega_" + legaId, JSON.stringify(state));
+  localStorage.setItem("ucl_lastLega", legaId);
+  if (legaMeta) localStorage.setItem("ucl_lastLegaMeta", JSON.stringify(legaMeta));
   // Update URL
   history.pushState(null, '', '?lega=' + legaId);
   const navLinks = document.querySelector(".nav-links");
   const hamburger = document.getElementById("hamburger");
   if (navLinks) navLinks.style.display = "";
-  if (hamburger) hamburger.style.display = "";
+  if (hamburger) hamburger.style.display = "flex";
   // Auto-sblocco admin per il creatore della lega
   if (isCreatoreCorrente()) {
     adminUnlocked = true;
@@ -2872,15 +4201,23 @@ function entraInLega(legaId, legaState, legaMeta) {
   // Add to user leghe if logged in
   if (currentUser) addLegaToUser(currentUser.uid, legaId, legaMeta?.nome || legaId);
   listenGlobal(); listenLega(legaId);
-  navigate("home");
+  subscribePlayerSostituzioni(legaId);
+  subscribePlayerRose(legaId);
+  if (currentUser) _ensureMyMembership();
+  const savedTab = localStorage.getItem("ucl_tab");
+  navigate(savedTab && savedTab !== "home" ? savedTab : "home");
+  initPushBtn();
 }
 
 function exitLega() {
   currentLegaId = null; currentLegaMeta = null;
   state = defaultLegaState();
+  if (_playerRoseUnsubscribe) { _playerRoseUnsubscribe(); _playerRoseUnsubscribe = null; }
+  _playerRoseState = {};
   adminUnlocked = false; votiUnlocked = false; superadminUnlocked = false;
   aggiornaTabAdmin();
-  localStorage.removeItem("fsa_lastLega"); localStorage.removeItem("fsa_lastLegaMeta");
+  localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
+  localStorage.removeItem("ucl_tab");
   history.pushState(null, '', location.pathname);
   const navLinks = document.querySelector(".nav-links");
   const hamburger = document.getElementById("hamburger");
@@ -3034,7 +4371,7 @@ function renderLobby() {
       if (res.error) { err.textContent = res.error; return; }
       // onAuthStateChanged will re-render lobby with user's leghe
       // If user has a last lega, auto-enter it
-      const lastLega = localStorage.getItem("fsa_lastLega");
+      const lastLega = localStorage.getItem("ucl_lastLega");
       if (lastLega && window._fbReady && window._db) {
         window._onVal(window._ref(window._db,"leghe/"+lastLega), snap=>{
           const d=snap.val();
@@ -3072,7 +4409,7 @@ function renderLobby() {
         superadminUnlocked = true;
         // Show nav
         const nl=document.querySelector(".nav-links"); if(nl) nl.style.display="";
-        const hb=document.getElementById("hamburger"); if(hb) hb.style.display="";
+        const hb=document.getElementById("hamburger"); if(hb) hb.style.display="flex";
         // Hide lobby explicitly
         const lobby=document.getElementById("page-lobby");
         if(lobby){lobby.classList.remove("active");lobby.style.display="none";}
@@ -3173,10 +4510,10 @@ function checkUrlLega() {
     }, { onlyOnce: true });
     return true;
   }
-  const lastLega = localStorage.getItem("fsa_lastLega");
+  const lastLega = localStorage.getItem("ucl_lastLega");
   if (lastLega) {
-    const cached = localStorage.getItem("fsa_lega_" + lastLega);
-    const cachedMeta = localStorage.getItem("fsa_lastLegaMeta");
+    const cached = localStorage.getItem("ucl_lega_" + lastLega);
+    const cachedMeta = localStorage.getItem("ucl_lastLegaMeta");
     if (cached) {
       try {
         entraInLega(lastLega, JSON.parse(cached), cachedMeta ? JSON.parse(cachedMeta) : null);
@@ -3197,11 +4534,26 @@ function checkUrlLega() {
 
 
 // ── SUPERADMIN MODAL ──
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("btnNavSuperadmin")?.addEventListener("click", () => {
+// Accesso via Ctrl+Shift+S (desktop) o ?sa=1 in URL (mobile)
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === "S") {
     document.getElementById("superadminModal").style.display = "flex";
     setTimeout(() => document.getElementById("superModalPwd")?.focus(), 50);
-  });
+  }
+});
+if (new URLSearchParams(location.search).get("sa") === "1") {
+  window.history.replaceState({}, "", location.pathname);
+  const _openSuperModal = () => {
+    document.getElementById("superadminModal").style.display = "flex";
+    setTimeout(() => document.getElementById("superModalPwd")?.focus(), 50);
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", _openSuperModal);
+  } else {
+    _openSuperModal();
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnSuperModalSubmit")?.addEventListener("click", async () => {
     const val = document.getElementById("superModalPwd").value;
     const hash = await sha256(val);
@@ -3211,7 +4563,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("superModalPwd").value = "";
       // Show nav tabs for superadmin
       document.getElementById("navLinks").style.display = "";
-      document.getElementById("hamburger").style.display = "";
+      document.getElementById("hamburger").style.display = "flex";
       navigate("superadmin");
     } else {
       document.getElementById("superModalErr").textContent = "❌ Password errata";
@@ -3229,33 +4581,36 @@ if (_navL) _navL.style.display = "none";
 if (_hamb) _hamb.style.display = "none";
 
 function startApp() {
+  if (typeof applyTranslations === "function") applyTranslations();
   listenGlobal();
-  listenGiocatori(); // ascolta global/giocatori indipendentemente dalla lega
   if (window._fbReady && window._db) {
     window._onVal(window._ref(window._db,"global"), snap=>{
       const d=snap.val();
       if(d&&(d._updatedAt||0)>(globalState._updatedAt||0)){
-        const giocSalvati = globalState.giocatoriSquadra;
-        const votiSalvati = globalState.voti;
         globalState=sanitizeGlobalState(d);
-        globalState.giocatoriSquadra = giocSalvati || globalState.giocatoriSquadra || {};
-        globalState.voti = votiSalvati || globalState.voti || {};
-        localStorage.setItem("fsa_global",JSON.stringify(globalState));
+        localStorage.setItem("ucl_global",JSON.stringify(globalState));
       }
-      // Check URL for lega param
       if(!checkUrlLega()){
-        // Show home page
         renderHomeButtons();
         navigate("home");
       }
+      _hideAuthLoader();
     },{onlyOnce:true});
   } else {
     if(!checkUrlLega()){ renderHomeButtons(); navigate("home"); }
+    _hideAuthLoader();
   }
 }
 
+function _hideAuthLoader() {
+  const el = document.getElementById("authLoader");
+  if (!el) return;
+  el.classList.add("hidden");
+  setTimeout(() => el.remove(), 250);
+}
+
 function initAuth() {
-  if(!window._fbAuth){startApp();return;}
+  if(!window._fbAuth){_hideAuthLoader();startApp();return;}
   import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js").then(({onAuthStateChanged})=>{
     onAuthStateChanged(window._fbAuth, user=>{
       currentUser=user;
@@ -3264,7 +4619,7 @@ function initAuth() {
         renderSidebar();
       }
     });
-  }).catch(()=>startApp());
+  }).catch(()=>{_hideAuthLoader();startApp();});
 }
 
 // First load
@@ -3272,7 +4627,7 @@ setTimeout(()=>{
   if(window._fbReady) { initAuth(); startApp(); }
   else{
     const chk=setInterval(()=>{if(window._fbReady){clearInterval(chk);initAuth();startApp();}},200);
-    setTimeout(()=>{clearInterval(chk);if(!currentLegaId){renderHomeButtons();navigate("home");}},4000);
+    setTimeout(()=>{clearInterval(chk);_hideAuthLoader();if(!currentLegaId){renderHomeButtons();navigate("home");}},4000);
   }
 },80);
 
@@ -3326,16 +4681,16 @@ function _renderGiocTabellone() {
   const wrap   = document.getElementById("giocatoriTabellone");
   if (!wrap) return;
 
-  const RUOLO_LABEL = { P:"Portiere", D:"Difensore", C:"Centrocampista", A:"Attaccante" };
+  const RUOLO_LABEL = { P:t("roles.P"), D:t("roles.D"), C:t("roles.C"), A:t("roles.A") };
   const RUOLO_ICON  = { P:"🧤", D:"🛡", C:"⚙️", A:"⚽" };
-  const ordine      = { P:0, D:1, C:2, A:3 };
 
   let totalCount = 0;
   let html = "";
 
-  // Squadre in ordine alfabetico
-  const squadreOrdinate = Object.keys(db).sort((a,b) => a.localeCompare(b));
-
+  // Serie A: iterazione flat su tutti i club presenti nel db (nessun girone)
+  const ordine = { P:0, D:1, C:2, A:3 };
+  const squadreOrdinate = SQUADRE.length > 0 ? SQUADRE : Object.keys(db).sort();
+  let clubHtml = "";
   squadreOrdinate.forEach(squadra => {
     const giocatori = (db[squadra] || []).filter(g => {
       const matchRuolo  = ruolo === "tutti" || g.ruolo === ruolo;
@@ -3344,14 +4699,10 @@ function _renderGiocTabellone() {
         squadra.toLowerCase().includes(search);
       return matchRuolo && matchSearch;
     });
-
     if (giocatori.length === 0) return;
     totalCount += giocatori.length;
-
-    // Ordina: P → D → C → A, poi alfabetico per nome
     giocatori.sort((a,b) => (ordine[a.ruolo]??9) - (ordine[b.ruolo]??9) || a.nome.localeCompare(b.nome));
-
-    html += `<div class="gioc-squadra-card">
+    clubHtml += `<div class="gioc-squadra-card">
       <div class="gioc-squadra-header">${squadra}</div>
       <div class="gioc-players-list">
         ${giocatori.map(g => `
@@ -3363,11 +4714,14 @@ function _renderGiocTabellone() {
       </div>
     </div>`;
   });
+  if (clubHtml) {
+    html += `<div class="gioc-squadre-grid">${clubHtml}</div>`;
+  }
 
   if (!html) {
     wrap.innerHTML = `<div class="gioc-empty"><span class="material-symbols-outlined" style="font-size:40px;color:var(--text2)">search_off</span><p>Nessun risultato trovato.</p></div>`;
   } else {
-    wrap.innerHTML = `<div class="gioc-squadre-grid">${html}</div>`;
+    wrap.innerHTML = html;
   }
 
   const countEl = document.getElementById("giocatoriCount");
@@ -3377,11 +4731,15 @@ function _renderGiocTabellone() {
 
 // ── LA MIA SQUADRA ───────────────────────────────────────────
 const ROSA_REQUISITI = { P:3, D:6, C:6, A:5 };
-const ROSA_TOTALE    = 20; // 3+6+6+5
-const DEADLINE_ISO   = "2099-01-01T00:00:00Z"; // Nessuna deadline — modifica sempre abilitata
+const ROSA_TOTALE    = 20; // 3+6+6+5 — 1 giocatore per club Serie A (20 club)
+const DEADLINE_ISO   = "2026-08-22T16:30:00Z"; // prima della prima partita Serie A G1 (22 ago ore 18:30 CEST)
+const FINALE_ISO     = "2027-05-31T00:00:00Z"; // dopo l'ultima giornata Serie A 2026/27 (G38 = 30/05/2027)
 
 function isDeadlinePassata() {
-  return false; // deadline disabilitata — squadra sempre modificabile
+  return Date.now() >= new Date(DEADLINE_ISO).getTime();
+}
+function isFinalePassata() {
+  return Date.now() >= new Date(FINALE_ISO).getTime();
 }
 
 // Stato locale del costruttore (non salvato finché non si preme Salva)
@@ -3441,7 +4799,7 @@ function renderSquadraPage() {
     <div class="squadra-header-row">
       <div>
         <h1 style="margin:0;font-size:22px"><span class="material-symbols-outlined header-icon">shield</span> La mia Squadra</h1>
-        <p class="subtitle" style="margin:4px 0 0">Scegli un giocatore per ogni squadra · 3P · 6D · 6C · 5A · max 1 per squadra</p>
+        <p class="subtitle" style="margin:4px 0 0">Scegli un giocatore per ogni squadra · 6P · 15D · 15C · 12A</p>
       </div>
       <div id="squadraTimerWrap" class="squadra-timer-wrap"></div>
     </div>
@@ -3450,9 +4808,10 @@ function renderSquadraPage() {
       <div class="squadra-req-row" id="squadraReqRow"></div>
       <div class="squadra-save-row">
         ${deadline
-          ? `<span style="color:var(--red);font-size:13px">⏱ Deadline scaduta – la squadra non è più modificabile.</span>`
+          ? ``
           : `<button class="btn-primary" id="btnSalvaSquadra" disabled>💾 Salva Squadra</button>
-             <button class="btn-sec" id="btnResetBozza">↺ Ripristina salvata</button>`
+             <button class="btn-sec" id="btnResetBozza">↺ Ripristina salvata</button>
+             <span id="squadraPrivacySlot"></span>`
         }
       </div>
     </div>
@@ -3502,6 +4861,29 @@ function renderSquadraPage() {
   _startTimer();
   _renderSquadraUI();
   _bindSquadraEvents(deadline);
+  if (deadline) renderSostSelfService();
+  else _renderRosaPrivacyToggle();
+}
+
+// Toggle "nascondi la mia rosa agli altri" (visibile solo se ho una rosa salvata)
+function _renderRosaPrivacyToggle() {
+  const el = document.getElementById("squadraPrivacySlot");
+  if (!el || !currentUser) return;
+  const mine = _playerRoseState[currentUser.uid];
+  const hasRosa = mine?.rosa && Object.values(mine.rosa).some(a => Array.isArray(a) && a.length);
+  if (!hasRosa) { el.innerHTML = ""; return; }
+  const nascosta = !!mine.nascosta;
+  el.innerHTML = `<button class="btn-sec" id="btnToggleNascondi" style="font-size:13px" title="${nascosta ? 'La tua rosa è nascosta agli altri' : 'Nascondi la tua rosa agli altri fino al calcio d\'inizio'}">
+    ${nascosta ? "👁 Visibile" : "🙈 Nascondi"}
+  </button>`;
+  document.getElementById("btnToggleNascondi")?.addEventListener("click", async () => {
+    const btn = document.getElementById("btnToggleNascondi");
+    if (btn) btn.disabled = true;
+    const ok = await _saveMyPlayerRose({ nascosta: !nascosta });
+    if (ok) { toast(nascosta ? "✅ Rosa ora visibile agli altri" : "🔒 Rosa nascosta agli altri fino all'11 giugno"); }
+    else if (btn) btn.disabled = false;
+    _renderRosaPrivacyToggle();
+  });
 }
 
 function _getMyPartId() {
@@ -3515,12 +4897,338 @@ function _getMyPartId() {
   return byNome ? byNome.id : null;
 }
 
+// ── SOSTITUZIONI SELF-SERVICE ─────────────────────────────────
+
+function renderSostSelfService() {
+  const wrap = document.getElementById("squadraRosaSolo");
+  if (!wrap) return;
+
+  const partId = _getMyPartId();
+  if (!partId || !currentUser) {
+    wrap.innerHTML = `<p class="hint" style="margin-top:24px">Accedi per gestire le tue sostituzioni.</p>`;
+    return;
+  }
+
+  const finestraId = getCurrentFinestraAperta();
+  const uid        = currentUser.uid;
+  const mySost     = _playerSostState[uid] || {};
+  const adminSost  = state.sostituzioni?.[partId] || {};
+  const rosaBase   = state.rose[partId];
+  const effectiveRosa = getEffectiveRosa(partId, 999) || rosaBase || {};
+  const capitano   = state.partecipanti?.find(p => p.id === partId)?.capitanoGiocatore || null;
+  const partNome   = state.partecipanti?.find(p => p.id === partId)?.nome || "";
+
+  // Conta sost totali già fatte (player + admin per ogni finestra)
+  const sostTotali = Object.values(getSostEffective(partId))
+    .reduce((tot, arr) => tot + (arr?.length || 0), 0);
+  const rimanenti  = MAX_SOST_TOTALI - sostTotali;
+
+  // Rosa registrata (con sost applicate)
+  const rosaHtml = effectiveRosa ? `<div class="my-rosa-section">
+    <div class="my-rosa-header">
+      <span class="my-rosa-title">La mia rosa</span>
+      ${partNome ? `<span style="font-size:12px;color:var(--text2)">${partNome}</span>` : ''}
+    </div>
+    ${['P','D','C','A'].map(r => {
+      const players = effectiveRosa[r] || [];
+      if (!players.length) return '';
+      return `<div class="my-rosa-ruolo">
+        <div class="my-rosa-ruolo-label">${_ruoloIcon(r)} ${_ruoloLabel(r)}</div>
+        <div class="my-rosa-players">
+          ${players.map(g => `<span class="my-rosa-player${g.nome === capitano ? ' my-rosa-cap' : ''}">
+            <span class="my-rosa-nome">${g.nome === capitano ? '⭐ ' : ''}${g.nome}</span><span class="my-rosa-naz">${g.nazione}</span>
+          </span>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>` : '';
+
+  // Header stato
+  let headerHtml = `<div class="sost-self-header">
+    <h3 class="sost-self-title">🔄 Le mie Sostituzioni</h3>
+    <span class="sost-self-counter">${sostTotali}/${MAX_SOST_TOTALI} usate · ${rimanenti} rimanenti</span>
+  </div>`;
+
+  // Stato finestra
+  let finestraHtml = "";
+  if (finestraId) {
+    const f = FINESTRE_TIMING[finestraId];
+    const closeStr = f.close
+      ? new Date(f.close).toLocaleString("it-IT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" })
+      : "TBD";
+    finestraHtml = `<div class="sost-finestra-badge open">
+      ✅ ${f.label} aperta · chiude il ${closeStr}
+    </div>`;
+  } else {
+    // Determina prossima finestra
+    const now = Date.now();
+    const prossima = Object.entries(FINESTRE_TIMING).find(([, f]) => new Date(f.open).getTime() > now);
+    if (prossima) {
+      const [, fp] = prossima;
+      const openStr = new Date(fp.open).toLocaleString("it-IT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+      finestraHtml = `<div class="sost-finestra-badge closed">⏳ Finestra chiusa · prossima apertura il ${openStr}</div>`;
+    } else {
+      finestraHtml = `<div class="sost-finestra-badge closed">⏹ Tutte le finestre di sostituzione sono terminate.</div>`;
+    }
+  }
+
+  // Assicura che _sostEditMode sia per la finestra ancora aperta
+  if (_sostEditMode && _sostEditMode.finestraId !== finestraId) _sostEditMode = null;
+  const editMode = _sostEditMode !== null;
+
+  // Sostituzioni già effettuate (per tutte le finestre)
+  let historyHtml = "";
+  for (const [fIdStr, sosts] of Object.entries(getSostEffective(partId))) {
+    if (!sosts?.length) continue;
+    const fId     = Number(fIdStr);
+    const label   = FINESTRE_TIMING[fId]?.label || `Finestra ${fId}`;
+    const isAdmin = (Array.isArray(adminSost[fId]) && adminSost[fId].length > 0);
+    const canEdit = !isAdmin && fId === finestraId;
+    historyHtml += `<div class="sost-history-group">
+      <div class="sost-history-label">${label}${isAdmin ? ' <span class="sost-admin-badge">admin</span>' : ''}</div>
+      ${sosts.map((s, idx) => {
+        const isBeingEdited = editMode && _sostEditMode.finestraId === fId && _sostEditMode.idx === idx;
+        return `<div class="sost-history-row${isBeingEdited ? ' sost-row-editing' : ''}">
+          <span class="sost-out">${_ruoloIcon(s.ruolo)} ${s.outNome} <span class="sost-naz">${s.outNazione}</span></span>
+          <span class="sost-arrow">→</span>
+          <span class="sost-in">${_ruoloIcon(s.ruolo)} ${s.inNome} <span class="sost-naz">${s.inNazione}</span></span>
+          ${canEdit ? `<button class="sost-edit-btn" data-fid="${fId}" data-idx="${idx}" title="Modifica">✏️</button><button class="sost-delete-btn" data-fid="${fId}" data-idx="${idx}" title="Elimina">🗑️</button>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Form nuova sostituzione (solo se finestra aperta e rimanenti > 0, oppure in edit mode)
+  let formHtml = "";
+  if (finestraId && (rimanenti > 0 || editMode) && rosaBase) {
+    // Ruoli usati nella finestra corrente, escludendo quello in editing
+    const sostFinestra = mySost[finestraId] || [];
+    const ruoliUsatiQuesta = sostFinestra
+      .map((s, i) => (editMode && _sostEditMode.idx === i) ? null : s.ruolo)
+      .filter(Boolean);
+
+    // Conta utilizzi per ruolo su TUTTE le finestre — escludi se raggiunto MAX_SOST_PER_RUOLO
+    const allSostEff = getSostEffective(partId);
+    const roleCount = {};
+    for (const [, sosts] of Object.entries(allSostEff)) {
+      for (const s of (sosts || [])) {
+        roleCount[s.ruolo] = (roleCount[s.ruolo] || 0) + 1;
+      }
+    }
+
+    const ruoliEsclusi = new Set(
+      Object.keys(ROSA_REQUISITI).filter(r =>
+        ruoliUsatiQuesta.includes(r) || (roleCount[r] || 0) >= MAX_SOST_PER_RUOLO
+      )
+    );
+    const ruoliDisponibili = Object.keys(ROSA_REQUISITI)
+      .filter(r => !ruoliEsclusi.has(r));
+
+    if (ruoliDisponibili.length === 0) {
+      formHtml = `<p class="hint">Hai già usato un cambio per ogni ruolo in questa finestra.</p>`;
+    } else {
+      const ruoloOpts = ruoliDisponibili.map(r =>
+        `<option value="${r}">${_ruoloIcon(r)} ${_ruoloLabel(r)}</option>`
+      ).join('');
+      const formTitle = editMode
+        ? `✏️ Modifica sostituzione (${FINESTRE_TIMING[finestraId].label})`
+        : `➕ Nuova sostituzione (${FINESTRE_TIMING[finestraId].label})`;
+      const btnLabel = editMode ? '💾 Aggiorna sostituzione' : '💾 Conferma sostituzione';
+
+      formHtml = `
+        <div class="sost-form${editMode ? ' sost-form--edit' : ''}" id="sostSelfForm">
+          <div class="sost-form-title">${formTitle}</div>
+          <div class="sost-form-row">
+            <label>Ruolo</label>
+            <select id="sostFormRuolo" class="sost-select">${ruoloOpts}</select>
+          </div>
+          <div class="sost-form-row">
+            <label>Esci</label>
+            <select id="sostFormOut" class="sost-select"><option value="">– seleziona –</option></select>
+          </div>
+          <div class="sost-form-row">
+            <label>Entra</label>
+            <select id="sostFormIn" class="sost-select" disabled><option value="">– seleziona –</option></select>
+          </div>
+          <div class="sost-form-btns">
+            <button class="btn-primary" id="btnSalvaSost" disabled>${btnLabel}</button>
+            ${editMode ? `<button class="sost-annulla-btn" id="btnAnnullaEditSost">✕ Annulla modifica</button>` : ''}
+          </div>
+        </div>`;
+    }
+  }
+
+  wrap.innerHTML = `
+    <div class="sost-split-layout">
+      <div class="sost-split-rosa">${rosaHtml}</div>
+      <div class="sost-split-sost">
+        <div class="sost-self-wrap">
+          ${headerHtml}
+          ${finestraHtml}
+          ${historyHtml ? `<div class="sost-history">${historyHtml}</div>` : ''}
+          ${formHtml}
+        </div>
+      </div>
+    </div>`;
+
+  // Bottoni modifica sulle righe dello storico
+  wrap.querySelectorAll(".sost-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const fid  = Number(btn.dataset.fid);
+      const idx  = Number(btn.dataset.idx);
+      const sosts = _playerSostState[uid]?.[fid] || [];
+      if (sosts[idx]) {
+        _sostEditMode = { finestraId: fid, idx, sost: sosts[idx] };
+        renderSostSelfService();
+      }
+    });
+  });
+
+  // Bottoni elimina sulle righe dello storico
+  wrap.querySelectorAll(".sost-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const fid = Number(btn.dataset.fid);
+      const idx = Number(btn.dataset.idx);
+      if (!confirm("Eliminare questa sostituzione?")) return;
+      _sostEditMode = null;
+      await _deleteSostSelfService(uid, fid, idx);
+    });
+  });
+
+  // Annulla modifica
+  document.getElementById("btnAnnullaEditSost")?.addEventListener("click", () => {
+    _sostEditMode = null;
+    renderSostSelfService();
+  });
+
+  // Popola select "Esci" al cambio ruolo, e bind eventi form
+  if (finestraId && (rimanenti > 0 || editMode) && rosaBase) {
+    _bindSostForm(partId, uid, finestraId, rosaBase);
+  }
+}
+
+function _buildOutOptions(ruolo, rosaBase, capitanoNome) {
+  const arr = rosaBase[ruolo] || [];
+  return arr
+    .filter(g => g.nome !== capitanoNome)  // il capitano non può essere sostituito
+    .map(g => `<option value="${g.nome}|${g.nazione}">${g.nome} (${g.nazione})</option>`)
+    .join('');
+}
+
+function _buildInOptions(ruolo, nazione, rosaBase) {
+  // globalState.giocatoriSquadra è { nazione: [{nome, ruolo}] }
+  const inRosa = new Set((rosaBase[ruolo] || []).map(g => g.nome));
+  const candidati = (globalState.giocatoriSquadra?.[nazione] || []);
+  const lista = candidati
+    .filter(g => g.ruolo === ruolo && !inRosa.has(g.nome))
+    .map(g => g.nome);
+  if (!lista.length) return `<option value="">Nessun giocatore disponibile</option>`;
+  return lista.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+function _bindSostForm(partId, uid, finestraId, rosaBase) {
+  const selRuolo = document.getElementById("sostFormRuolo");
+  const selOut   = document.getElementById("sostFormOut");
+  const selIn    = document.getElementById("sostFormIn");
+  const btnSalva = document.getElementById("btnSalvaSost");
+  if (!selRuolo || !selOut || !selIn || !btnSalva) return;
+
+  const part = state.partecipanti?.find(p => p.id === partId);
+  const capitanoNome = part?.capitanoGiocatore || null;
+
+  const aggiornaOut = () => {
+    selOut.innerHTML = `<option value="">– seleziona –</option>` + _buildOutOptions(selRuolo.value, rosaBase, capitanoNome);
+    selIn.innerHTML  = `<option value="">– seleziona –</option>`;
+    selIn.disabled   = true;
+    btnSalva.disabled = true;
+  };
+
+  const aggiornaIn = () => {
+    const [nome, nazione] = (selOut.value || "").split("|");
+    if (!nome || !nazione) { selIn.disabled = true; btnSalva.disabled = true; return; }
+    selIn.innerHTML = `<option value="">– seleziona –</option>` + _buildInOptions(selRuolo.value, nazione, rosaBase);
+    selIn.disabled  = false;
+    btnSalva.disabled = true;
+  };
+
+  // Pre-popola se in edit mode
+  if (_sostEditMode && _sostEditMode.finestraId === finestraId) {
+    const old = _sostEditMode.sost;
+    if (selRuolo.querySelector(`option[value="${old.ruolo}"]`)) selRuolo.value = old.ruolo;
+    aggiornaOut();
+    const outVal = `${old.outNome}|${old.outNazione}`;
+    if (selOut.querySelector(`option[value="${outVal}"]`)) selOut.value = outVal;
+    aggiornaIn();
+    if (selIn.querySelector(`option[value="${old.inNome}"]`)) selIn.value = old.inNome;
+    btnSalva.disabled = !selIn.value;
+  } else {
+    aggiornaOut();
+  }
+
+  selRuolo.addEventListener("change", aggiornaOut);
+  selOut.addEventListener("change", aggiornaIn);
+  selIn.addEventListener("change", () => { btnSalva.disabled = !selIn.value; });
+
+  btnSalva.addEventListener("click", async () => {
+    const ruolo = selRuolo.value;
+    const [outNome, outNazione] = (selOut.value || "").split("|");
+    const inNome = selIn.value;
+    if (!ruolo || !outNome || !outNazione || !inNome) { toast("Compila tutti i campi!", true); return; }
+    if (capitanoNome && outNome === capitanoNome) { toast("Non puoi sostituire il capitano!", true); return; }
+    await _saveSostSelfService(uid, finestraId, { outNome, outNazione, ruolo, inNome, inNazione: outNazione });
+  });
+}
+
+async function _saveSostSelfService(uid, finestraId, nuovaSost) {
+  if (!currentLegaId || !window._db || !window._set || !window._ref) {
+    toast("Errore connessione Firebase", true); return;
+  }
+  const existing = (_playerSostState[uid]?.[finestraId]) || [];
+  let updated;
+  if (_sostEditMode && _sostEditMode.finestraId === finestraId) {
+    updated = [...existing];
+    updated[_sostEditMode.idx] = nuovaSost;
+    _sostEditMode = null;
+  } else {
+    updated = [...existing, nuovaSost];
+  }
+  try {
+    await window._set(
+      window._ref(window._db, `leghe/${currentLegaId}/playerSostituzioni/${uid}/${finestraId}`),
+      updated
+    );
+    toast("✅ Sostituzione salvata!");
+    // _playerSostState verrà aggiornato dal listener Firebase
+  } catch(e) {
+    console.error("_saveSostSelfService error:", e);
+    toast("Errore salvataggio: " + (e.message || e), true);
+  }
+}
+
+async function _deleteSostSelfService(uid, finestraId, idx) {
+  if (!currentLegaId || !window._db || !window._set || !window._ref) {
+    toast("Errore connessione Firebase", true); return;
+  }
+  const existing = (_playerSostState[uid]?.[finestraId]) || [];
+  const updated  = existing.filter((_, i) => i !== idx);
+  try {
+    await window._set(
+      window._ref(window._db, `leghe/${currentLegaId}/playerSostituzioni/${uid}/${finestraId}`),
+      updated.length > 0 ? updated : null
+    );
+    toast("✅ Sostituzione eliminata!");
+  } catch(e) {
+    console.error("_deleteSostSelfService error:", e);
+    toast("Errore eliminazione: " + (e.message || e), true);
+  }
+}
+
 function _ruoloIcon(r) {
   return {P:'🧤',D:'🛡',C:'⚙️',A:'⚽'}[r] || r;
 }
 
 function _ruoloLabel(r) {
-  return {P:'Portiere',D:'Difensore',C:'Centrocampista',A:'Attaccante'}[r] || r;
+  return t("roles."+r) || r;
 }
 
 function _renderSquadraUI() {
@@ -3638,20 +5346,30 @@ function _renderSquadraRosa() {
   const ruolo = _squadraFiltroRuolo;
   const bozza = _squadraBozza || {P:[],D:[],C:[],A:[]};
   const arr   = bozza[ruolo] || [];
+  const canBeCap = ruolo !== 'A'; // gli attaccanti non possono essere capitano
+  const capAttuale = _squadraBozzaCap;
 
   if (!arr.length) {
     listEl.innerHTML = `<div class="squadra-rosa-empty">Nessun ${_ruoloLabel(ruolo).toLowerCase()} selezionato</div>`;
     return;
   }
 
-  listEl.innerHTML = arr.map((g,i) => `
-    <div class="squadra-rosa-item">
+  listEl.innerHTML = arr.map((g,i) => {
+    const isCap = canBeCap && capAttuale && capAttuale.nome === g.nome && capAttuale.nazione === g.nazione;
+    const nomeQ = g.nome.replace(/"/g,'&quot;');
+    const nazQ  = g.nazione.replace(/"/g,'&quot;');
+    return `
+    <div class="squadra-rosa-item${isCap ? ' is-captain' : ''}">
       <span class="squadra-rosa-num">${i+1}</span>
       <span class="squadra-rosa-naz">${g.nazione}</span>
       <span class="squadra-rosa-nome">${g.nome}</span>
-      <button class="squadra-rosa-remove" data-nome="${g.nome.replace(/"/g,'&quot;')}"
-        data-naz="${g.nazione.replace(/"/g,'&quot;')}" data-ruolo="${ruolo}" title="Rimuovi">✕</button>
-    </div>`).join('');
+      ${canBeCap ? `<button class="squadra-rosa-cap${isCap ? ' active' : ''}"
+        data-cnome="${nomeQ}" data-cnaz="${nazQ}" data-cruolo="${ruolo}"
+        title="${isCap ? 'Rimuovi capitano' : 'Imposta come capitano'}">⭐</button>` : ''}
+      <button class="squadra-rosa-remove" data-nome="${nomeQ}"
+        data-naz="${nazQ}" data-ruolo="${ruolo}" title="Rimuovi">✕</button>
+    </div>`;
+  }).join('');
 }
 
 function _renderSquadraCapitano() {
@@ -3660,31 +5378,27 @@ function _renderSquadraCapitano() {
   if (!section || !listEl) return;
 
   const bozza = _squadraBozza || {P:[],D:[],C:[],A:[]};
-  // Tutti i giocatori non-attaccanti selezionati
-  const candidati = [
-    ...(bozza.P||[]).map(g=>({...g,ruolo:'P'})),
-    ...(bozza.D||[]).map(g=>({...g,ruolo:'D'})),
-    ...(bozza.C||[]).map(g=>({...g,ruolo:'C'})),
-  ];
+  const hasCandidati = [...(bozza.P||[]),...(bozza.D||[]),...(bozza.C||[])].length > 0;
 
-  if (!candidati.length) { section.style.display = 'none'; return; }
+  if (!hasCandidati) { section.style.display = 'none'; return; }
   section.style.display = '';
 
-  const capAttuale = _squadraBozzaCap;
-
-  listEl.innerHTML = candidati.map(g => {
-    const isSelected = capAttuale && capAttuale.nome === g.nome && capAttuale.nazione === g.nazione;
-    return `<div class="squadra-cap-item ${isSelected ? 'selected' : ''}"
-      data-cnome="${g.nome.replace(/"/g,'&quot;')}"
-      data-cnaz="${g.nazione.replace(/"/g,'&quot;')}"
-      data-cruolo="${g.ruolo}"
-      title="${isSelected ? 'Capitano attuale – clicca per rimuovere' : 'Scegli come capitano'}">
-      <span class="squadra-cap-icon">${_ruoloIcon(g.ruolo)}</span>
-      <span class="squadra-cap-naz">${g.nazione}</span>
-      <span class="squadra-cap-nome">${g.nome}</span>
-      ${isSelected ? '<span class="squadra-cap-star">⭐</span>' : ''}
+  const cap = _squadraBozzaCap;
+  if (cap) {
+    listEl.innerHTML = `<div class="squadra-cap-summary selected">
+      <span class="squadra-cap-summary-role">${_ruoloIcon(cap.ruolo)}</span>
+      <span class="squadra-cap-summary-name">⭐ ${cap.nome}</span>
+      <span class="squadra-cap-summary-naz">${cap.nazione}</span>
+      <button class="squadra-cap-remove-btn"
+        data-cnome="${cap.nome.replace(/"/g,'&quot;')}"
+        data-cnaz="${cap.nazione.replace(/"/g,'&quot;')}"
+        title="Rimuovi capitano">✕</button>
     </div>`;
-  }).join('');
+  } else {
+    listEl.innerHTML = `<div class="squadra-cap-summary empty">
+      Nessun capitano · clicca ⭐ su un giocatore (P/D/C)
+    </div>`;
+  }
 }
 
 function _bindSquadraEvents(deadline) {
@@ -3753,6 +5467,23 @@ function _bindSquadraEvents(deadline) {
 
   // Click rimuovi dalla rosa
   document.getElementById("squadraRosaList")?.addEventListener("click", e => {
+    // Click sul bottone ⭐ capitano inline
+    const capBtn = e.target.closest(".squadra-rosa-cap");
+    if (capBtn) {
+      const { cnome, cnaz, cruolo } = capBtn.dataset;
+      if (_squadraBozzaCap && _squadraBozzaCap.nome === cnome && _squadraBozzaCap.nazione === cnaz) {
+        _squadraBozzaCap = null;
+      } else {
+        _squadraBozzaCap = { nome: cnome, nazione: cnaz, ruolo: cruolo };
+        // Animazione pop
+        capBtn.classList.add('active', 'pop');
+        setTimeout(() => capBtn.classList.remove('pop'), 300);
+      }
+      _renderSquadraRosa();
+      _renderSquadraCapitano();
+      return;
+    }
+    // Click sul bottone ✕ rimuovi giocatore
     const btn = e.target.closest(".squadra-rosa-remove");
     if (!btn) return;
     const { nome, naz, ruolo } = btn.dataset;
@@ -3766,17 +5497,12 @@ function _bindSquadraEvents(deadline) {
     _renderSquadraUI();
   });
 
-  // Click capitano
+  // Click ✕ rimuovi capitano dal riepilogo
   document.getElementById("squadraCapList")?.addEventListener("click", e => {
-    const item = e.target.closest(".squadra-cap-item");
-    if (!item) return;
-    const { cnome, cnaz, cruolo } = item.dataset;
-    // Toggle: se già capitano, deseleziona
-    if (_squadraBozzaCap && _squadraBozzaCap.nome === cnome && _squadraBozzaCap.nazione === cnaz) {
-      _squadraBozzaCap = null;
-    } else {
-      _squadraBozzaCap = { nome: cnome, nazione: cnaz, ruolo: cruolo };
-    }
+    const btn = e.target.closest(".squadra-cap-remove-btn");
+    if (!btn) return;
+    _squadraBozzaCap = null;
+    _renderSquadraRosa();
     _renderSquadraCapitano();
   });
 
@@ -3822,7 +5548,7 @@ async function _salvaSquadra() {
   for (const [r, arr] of Object.entries(bozza)) {
     for (const g of arr) {
       if (nazViste.has(g.nazione)) {
-        conflitto = `Hai già un giocatore di ${g.nazione}: ${nazViste.get(g.nazione)} e ${g.nome}!`;
+        conflitto = `Hai due giocatori di ${g.nazione}: ${nazViste.get(g.nazione)} e ${g.nome}!`;
         break;
       }
       nazViste.set(g.nazione, g.nome);
@@ -3831,22 +5557,18 @@ async function _salvaSquadra() {
   }
   if (conflitto) { toast(conflitto, true); return; }
 
-  // Trova o crea il partecipante associato all'utente
-  let partId = _getMyPartId();
-  const nome = currentUser.displayName || currentUser.email?.split('@')[0] || "Giocatore";
-  if (!partId) {
-    // Crea partecipante
-    partId = currentUser.uid;
-    if (!Array.isArray(state.partecipanti)) state.partecipanti = [];
-    state.partecipanti.push({ id: partId, nome, uid: currentUser.uid, capitanoGiocatore: null });
-  }
+  if (!currentUser) { toast("Devi accedere per salvare la squadra.", true); return; }
 
-  state.rose[partId] = JSON.parse(JSON.stringify(bozza));
-  // Salva capitano
-  const part = state.partecipanti.find(p => p.id === partId);
-  if (part) part.capitanoGiocatore = _squadraBozzaCap ? _squadraBozzaCap.nome : null;
-  syncGiocatori();
-  saveState();
+  // Salva la rosa nel nodo self-service (scrivibile dall'utente stesso).
+  // L'admin NON deve fare nulla: il merge mostrerà subito il partecipante.
+  const capitanoNome = _squadraBozzaCap ? _squadraBozzaCap.nome : null;
+  const ok = await _saveMyPlayerRose({
+    rosa: JSON.parse(JSON.stringify(bozza)),
+    capitano: capitanoNome
+  });
+  if (!ok) { toast("Errore nel salvataggio. Riprova.", true); return; }
+
+  renderPage(currentPage());
   toast("✅ Squadra salvata!");
   // Aggiorna bottone salva
   const btn = document.getElementById("btnSalvaSquadra");
@@ -3858,28 +5580,67 @@ function _startTimer() {
   const wrap = document.getElementById("squadraTimerWrap");
   if (!wrap) return;
 
-  function updateTimer() {
-    const now  = Date.now();
-    const dead = new Date(DEADLINE_ISO).getTime();
-    const diff = dead - now;
-    if (diff <= 0) {
-      wrap.innerHTML = `<div class="squadra-timer expired">⏱ Iscrizioni chiuse</div>`;
-      clearInterval(_timerInterval);
-      return;
-    }
+  const deadlineMs = new Date(DEADLINE_ISO).getTime();
+
+  function fmtDiff(diff) {
     const days  = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
     const mins  = Math.floor((diff % 3600000)  / 60000);
     const secs  = Math.floor((diff % 60000)    / 1000);
-    const urgent = diff < 3600000; // < 1 ora
-    wrap.innerHTML = `<div class="squadra-timer ${urgent?'urgent':''}">
-      ⏱ Chiusura iscrizioni tra
-      ${days>0?`<strong>${days}g</strong>`:''}
-      <strong>${String(hours).padStart(2,'0')}h</strong>
-      <strong>${String(mins).padStart(2,'0')}m</strong>
-      <strong>${String(secs).padStart(2,'0')}s</strong>
-    </div>`;
+    return (days > 0 ? `<strong>${days}g</strong> ` : "") +
+      `<strong>${String(hours).padStart(2,'0')}h</strong> ` +
+      `<strong>${String(mins).padStart(2,'0')}m</strong> ` +
+      `<strong>${String(secs).padStart(2,'0')}s</strong>`;
   }
+
+  function updateTimer() {
+    const now = Date.now();
+
+    // Prima della deadline iscrizioni: countdown classico
+    if (now < deadlineMs) {
+      const diff   = deadlineMs - now;
+      const urgent = diff < 3600000;
+      wrap.innerHTML = `<div class="squadra-timer ${urgent ? 'urgent' : ''}">
+        ⏱ Chiusura iscrizioni tra ${fmtDiff(diff)}
+      </div>`;
+      return;
+    }
+
+    // Dopo la deadline: countdown finestre sostituzioni
+    const entries = Object.entries(FINESTRE_TIMING);
+    for (const [id, f] of entries) {
+      const openMs  = new Date(f.open).getTime();
+      const closeMs = f.close ? new Date(f.close).getTime() : Infinity;
+
+      if (now >= openMs && now < closeMs) {
+        // Finestra attualmente aperta
+        if (closeMs === Infinity) {
+          wrap.innerHTML = `<div class="squadra-timer active">🔓 ${f.label} aperta</div>`;
+        } else {
+          const diff   = closeMs - now;
+          const urgent = diff < 3600000;
+          wrap.innerHTML = `<div class="squadra-timer active ${urgent ? 'urgent' : ''}">
+            🔓 ${f.label} — chiude tra ${fmtDiff(diff)}
+          </div>`;
+        }
+        return;
+      }
+
+      if (now < openMs) {
+        // Prossima finestra non ancora aperta (gap tra finestre)
+        const diff = openMs - now;
+        wrap.innerHTML = `<div class="squadra-timer upcoming">
+          🔒 ${f.label} apre tra ${fmtDiff(diff)}
+        </div>`;
+        return;
+      }
+    }
+
+    // Tutte le finestre chiuse
+    wrap.innerHTML = `<div class="squadra-timer expired">🔒 Finestre di cambio chiuse</div>`;
+    clearInterval(_timerInterval);
+  }
+
   updateTimer();
   _timerInterval = setInterval(updateTimer, 1000);
 }

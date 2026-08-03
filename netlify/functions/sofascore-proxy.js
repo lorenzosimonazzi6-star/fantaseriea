@@ -1,19 +1,46 @@
 const https = require("https");
+const admin = require("firebase-admin");
+
+// ── FIREBASE ADMIN INIT ────────────────────────────────────
+let firebaseApp;
+function getDb() {
+  if (!firebaseApp) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    firebaseApp = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
+    }, "sofascore-proxy");
+  }
+  return admin.app("sofascore-proxy").database();
+}
 
 exports.handler = async function (event) {
-  const eventId = event.queryStringParameters?.eventId;
+  const { eventId, home, away } = event.queryStringParameters || {};
   if (!eventId) {
     return { statusCode: 400, body: JSON.stringify({ error: "eventId mancante" }) };
   }
 
   try {
-    // Chiamate parallele a lineups e incidents
     const [lineups, incidents] = await Promise.all([
       fetchRapidAPI(`/matches/get-lineups?matchId=${eventId}`),
       fetchRapidAPI(`/matches/get-incidents?matchId=${eventId}`),
     ]);
 
-    const result = parseLineupsWithIncidents(lineups, incidents);
+    // Carica playerIndex e aliases se le nazioni sono note
+    let playerIndex = {}, playerAliases = {};
+    if (home || away) {
+      try {
+        const db = getDb();
+        [playerIndex, playerAliases] = await Promise.all([
+          loadPlayerIndex(db),
+          loadPlayerAliases(db),
+        ]);
+      } catch (e) {
+        console.warn("[sofascore-proxy] Impossibile caricare playerIndex/aliases:", e.message);
+      }
+    }
+
+    const result = parseLineupsWithIncidents(lineups, filterPreShootoutIncidents(incidents), home, away, playerIndex, playerAliases);
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -35,6 +62,93 @@ exports.handler = async function (event) {
   }
 };
 
+// ── NAME RESOLUTION (uguale al scheduled-poller) ───────────
+function normalizeName(name) {
+  return String(name)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function lastName(normalized) {
+  const words = normalized.split(" ").filter(w => w.length > 1);
+  return words[words.length - 1] || normalized;
+}
+
+function safeKey(s) { return String(s).replace(/[.#$[\]]/g, "_"); }
+
+async function loadPlayerIndex(db) {
+  const snap = await db.ref("global/giocatoriSquadra").once("value");
+  const squadre = snap.val() || {};
+  const index = {};
+  for (const [nazione, players] of Object.entries(squadre)) {
+    index[nazione] = {};
+    const arr = Array.isArray(players) ? players : Object.values(players);
+    for (const p of arr) {
+      if (p?.nome) index[nazione][normalizeName(p.nome)] = p.nome;
+    }
+  }
+  return index;
+}
+
+async function loadPlayerAliases(db) {
+  const snap = await db.ref("global/playerAliases").once("value");
+  return snap.val() || {};
+}
+
+function resolvePlayerName(sofaName, nationIndex, nationAliases) {
+  if (nationAliases?.[safeKey(sofaName)]) return nationAliases[safeKey(sofaName)];
+  if (!nationIndex) return sofaName;
+  const norm      = normalizeName(sofaName);
+  const sofaLast  = lastName(norm);
+  const sofaWords = norm.split(" ").filter(w => w.length > 1);
+
+  if (nationIndex[norm]) return nationIndex[norm];
+
+  {
+    const lnMatches = [];
+    for (const [normDb, dbName] of Object.entries(nationIndex)) {
+      if (lastName(normDb) === sofaLast && sofaLast.length >= 3) {
+        lnMatches.push({ normDb, dbName });
+      }
+    }
+    if (lnMatches.length === 1) return lnMatches[0].dbName;
+    if (lnMatches.length > 1) {
+      const sofaFirst = norm.split(" ")[0];
+      if (sofaFirst) {
+        const exact = lnMatches.find(({ normDb }) => normDb.split(" ")[0] === sofaFirst);
+        if (exact) return exact.dbName;
+        const prefixed = lnMatches.filter(({ normDb }) => {
+          const dbFirst = normDb.split(" ")[0];
+          return dbFirst.startsWith(sofaFirst) || sofaFirst.startsWith(dbFirst);
+        });
+        if (prefixed.length === 1) return prefixed[0].dbName;
+      }
+      return lnMatches[0].dbName;
+    }
+  }
+
+  if (sofaWords.length >= 2) {
+    const sofaSet = new Set(sofaWords);
+    for (const [normDb, dbName] of Object.entries(nationIndex)) {
+      const dbWords = normDb.split(" ").filter(w => w.length > 1);
+      if (dbWords.length === sofaWords.length && dbWords.every(w => sofaSet.has(w))) return dbName;
+    }
+  }
+
+  const normFlat = norm.replace(/ /g, "");
+  for (const [normDb, dbName] of Object.entries(nationIndex)) {
+    const dbFlat = normDb.replace(/ /g, "");
+    if (dbFlat.length >= 4 && (normFlat.includes(dbFlat) || dbFlat.includes(normFlat))) return dbName;
+  }
+
+  return sofaName;
+}
+
+// ── RAPID API ──────────────────────────────────────────────
 function fetchRapidAPI(path) {
   return new Promise((resolve, reject) => {
     const options = {
@@ -76,14 +190,24 @@ function mapPosition(pos) {
   return "C";
 }
 
-// Costruisce una mappa { nomeGiocatore: { amm, esp, rig } } dagli incidents
-function parseCardsFromIncidents(incidents) {
-  const cards = {}; // { playerName: { amm: bool, esp: bool } }
-  const penaltySaved = {}; // { portiereName: count }
-  const penaltyScored = {}; // { calciatoreName: bool } — per dedurre rigore segnato (portiere non ha parato)
+// Rimuove gli incident della lotteria dei rigori prima del parsing,
+// così flags e conteggi riflettono solo i 120' di gioco.
+function filterPreShootoutIncidents(incidents) {
+  const shootoutPeriods = new Set(["shootout", "penalties"]);
+  const filtered = (incidents?.incidents || []).filter(inc => {
+    const period = (inc.period || "").toLowerCase();
+    if (shootoutPeriods.has(period)) return false;
+    if (inc.incidentClass === "shootout" || inc.incidentClass === "penaltyShootout") return false;
+    if (inc.incidentType === "penaltyShootout") return false;
+    return true;
+  });
+  return { ...incidents, incidents: filtered };
+}
 
+function parseCardsFromIncidents(incidents) {
+  const cards = {};
+  const penaltyScored = {};
   for (const inc of (incidents.incidents || [])) {
-    // Cartellini
     if (inc.incidentType === "card" && inc.player) {
       const name = inc.player.name;
       if (!cards[name]) cards[name] = { amm: false, esp: false };
@@ -91,68 +215,43 @@ function parseCardsFromIncidents(incidents) {
         cards[name].amm = true;
       } else if (inc.incidentClass === "red" || inc.incidentClass === "yellowRed") {
         cards[name].esp = true;
-        cards[name].amm = false; // il rosso include già il giallo
+        cards[name].amm = false;
       }
     }
-
-    // Gol da rigore — per sapere se il portiere ha subito un rigore
     if (inc.incidentType === "goal" && inc.incidentClass === "penalty" && inc.player) {
       penaltyScored[inc.player.name] = (penaltyScored[inc.player.name] || 0) + 1;
     }
-
-    // Rigore parato: se il portiere ha penaltyFaced ma non c'è gol da rigore corrispondente
-    // Lo gestiamo nel parseLineups confrontando penaltyFaced con i gol da rigore subiti
   }
-
   return { cards, penaltyScored };
-}
-
-// Calcola rigori parati per portiere: penaltyFaced - rigori segnati contro di lui
-function calcPenaltySaved(stats, goalsAgainstPenalty) {
-  const faced = stats?.penaltyFaced || 0;
-  return Math.max(0, faced - goalsAgainstPenalty);
 }
 
 function extractFlags(stats, ruolo, goalsAgainst, goalsAgainstPenalty, cardInfo) {
   const flags = {};
-
-  // Gol (multi) — tutti i ruoli
-  if ((stats?.goals || 0) > 0) flags.gol = stats.goals;
-
-  // Assist (multi) — tutti i ruoli
+  const gol = (stats?.goals || 0) + (stats?.goalNormal || 0);
+  if (gol > 0) flags.gol = gol;
   if ((stats?.goalAssist || 0) > 0) flags.assist = stats.goalAssist;
-
-  // Autogol (multi) — tutti i ruoli
   if ((stats?.ownGoals || 0) > 0) flags.aut = stats.ownGoals;
-
-  // Solo portiere
-  if (ruolo === "P") {
-    // Rigori parati (multi) — deducibile da penaltyFaced - rigori segnati contro
-    const rigPar = calcPenaltySaved(stats, goalsAgainstPenalty);
-    if (rigPar > 0) flags.rigpar = rigPar;
-
-    // Porta inviolata
-    if ((stats?.minutesPlayed || 0) >= 90 && goalsAgainst === 0) flags.pi = 1;
-
-    // Gol subiti (multi)
-    if (goalsAgainst > 0) flags.gs = goalsAgainst;
-  }
-
-  // Cartellini dagli incidents (più affidabili delle stats)
+  if ((stats?.penaltyMiss || 0) > 0) flags.rig = true;
   if (cardInfo?.amm) flags.amm = true;
   if (cardInfo?.esp) flags.esp = true;
-
-  // Rigore sbagliato — da penaltyMiss nelle stats (non negli incidents)
-  if ((stats?.penaltyMiss || 0) > 0) flags.rig = true;
-
+  if (ruolo === "P") {
+    const hasPlayed = (stats?.minutesPlayed || 0) > 0;
+    if (hasPlayed) {
+      const faced  = stats?.penaltyFaced || 0;
+      const rigPar = Math.max(0, faced - (goalsAgainstPenalty || 0));
+      if (rigPar > 0) flags.rigpar = rigPar;
+      const gs = stats?.goalsConceded !== undefined ? stats.goalsConceded : goalsAgainst;
+      if (gs === 0) flags.pi = 1;
+      if (gs > 0)   flags.gs = gs;
+    }
+  }
   return flags;
 }
 
-function parseLineupsWithIncidents(lineups, incidents) {
+function parseLineupsWithIncidents(lineups, incidents, homeNazione, awayNazione, playerIndex, playerAliases) {
   const result = { home: [], away: [] };
   const { cards, penaltyScored } = parseCardsFromIncidents(incidents);
 
-  // Gol totali per squadra (inclusi autogol)
   const goalsHome = (lineups.home?.players || [])
     .reduce((s, e) => s + (e.statistics?.goals || 0), 0)
     + (lineups.away?.players || []).reduce((s, e) => s + (e.statistics?.ownGoals || 0), 0);
@@ -160,7 +259,6 @@ function parseLineupsWithIncidents(lineups, incidents) {
     .reduce((s, e) => s + (e.statistics?.goals || 0), 0)
     + (lineups.home?.players || []).reduce((s, e) => s + (e.statistics?.ownGoals || 0), 0);
 
-  // Rigori segnati contro ciascuna squadra
   const penaltyAgainstHome = Object.entries(penaltyScored)
     .filter(([name]) => (lineups.away?.players || []).some(e => e.player.name === name))
     .reduce((s, [,v]) => s + v, 0);
@@ -168,10 +266,13 @@ function parseLineupsWithIncidents(lineups, incidents) {
     .filter(([name]) => (lineups.home?.players || []).some(e => e.player.name === name))
     .reduce((s, [,v]) => s + v, 0);
 
+  const nazioni = { home: homeNazione, away: awayNazione };
+
   for (const side of ["home", "away"]) {
-    const goalsAgainst      = side === "home" ? goalsAway : goalsHome;
-    const penaltyAgainst    = side === "home" ? penaltyAgainstHome : penaltyAgainstAway;
-    const players = lineups[side]?.players || [];
+    const goalsAgainst   = side === "home" ? goalsAway : goalsHome;
+    const penaltyAgainst = side === "home" ? penaltyAgainstHome : penaltyAgainstAway;
+    const nazione        = nazioni[side];
+    const players        = lineups[side]?.players || [];
 
     for (const entry of players) {
       const p      = entry.player;
@@ -181,9 +282,14 @@ function parseLineupsWithIncidents(lineups, incidents) {
       const sv     = entry.substitute === true && !(stats?.minutesPlayed > 0);
       const flags  = extractFlags(stats, ruolo, goalsAgainst, penaltyAgainst, cards[p.name]);
 
+      const resolvedName = nazione
+        ? resolvePlayerName(p.name, playerIndex?.[nazione], playerAliases?.[nazione])
+        : p.name;
+
       result[side].push({
         id: p.id,
-        name: p.name,
+        name: resolvedName,
+        sofaName: p.name,
         shortName: p.shortName,
         position: ruolo,
         rating,

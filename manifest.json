@@ -1,0 +1,52 @@
+﻿{
+  "name": "ArenaSerieA",
+  "short_name": "ArenaSerieA",
+  "description": "Gioco fantasy gratuito per la Serie A 2026/27",
+  "start_url": ".",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050D1A",
+  "theme_color": "#050D1A",
+  "lang": "it",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "og-image.svg",
+      "sizes": "1200x630",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "ArenaSerieA — Serie A 2026/27"
+    }
+  ],
+  "categories": ["sports", "games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Classifica",
+      "short_name": "Classifica",
+      "description": "Vai alla classifica della tua lega",
+      "url": "./?page=classifica",
+      "icons": [{ "src": "logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Giocatori",
+      "short_name": "Giocatori",
+      "description": "Esplora tutti i giocatori",
+      "url": "./?page=giocatori",
+      "icons": [{ "src": "logo.png", "sizes": "96x96" }]
+    }
+  ]
+}

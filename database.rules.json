@@ -1,0 +1,82 @@
+{
+  "rules": {
+
+    // ── Stato globale (voti, giornataCorrente, giocatoriSquadra) ──
+    // Lettura: tutti (serve anche senza login per la home pubblica)
+    // Scrittura: solo utenti autenticati (la verifica admin è lato client)
+    "global": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    // ── Leghe ─────────────────────────────────────────────────────
+    "leghe": {
+      ".read": true,
+
+      "$legaId": {
+        // Scrittura al nodo radice della lega: permette creazione (prima volta)
+        // e cancellazione/modifica completa da parte dell'adminUid
+        ".write": "auth != null && (
+          !data.exists() ||
+          data.child('meta').child('adminUid').val() === auth.uid
+        )",
+
+        // Meta: leggibile da tutti, scrivibile solo dall'adminUid
+        "meta": {
+          ".read": true,
+          ".write": "auth != null && (
+            !data.exists() ||
+            data.child('adminUid').val() === auth.uid
+          )"
+        },
+
+        // State: leggibile da tutti, scrivibile solo dall'adminUid
+        "state": {
+          ".read": true,
+          ".write": "auth != null &&
+            root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
+        },
+
+        // playerSostituzioni: ogni utente autenticato scrive SOLO il proprio nodo {uid}
+        // Lettura aperta a tutti i membri (serve al calcolo punteggi e alla vista admin)
+        "playerSostituzioni": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+
+        // playerRose: lettura aperta a tutti i membri autenticati (serve a classifica
+        // e calcolo punteggi). La privacy pre-deadline è gestita client-side con
+        // isDeadlinePassata(). Ogni utente può scrivere solo il proprio nodo.
+        "playerRose": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+
+        // Eventuali altri path sotto una lega (chat, pushSubscriptions, ecc.): solo adminUid
+        "$other": {
+          ".read": true,
+          ".write": "auth != null &&
+            root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
+        }
+      }
+    },
+
+    // ── Dati per utente (lista leghe seguite) ─────────────────────
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    // ── Qualsiasi altro path: blocca tutto ────────────────────────
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

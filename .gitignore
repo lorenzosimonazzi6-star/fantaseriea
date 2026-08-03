@@ -1,1 +1,22 @@
-*.json
+# Dipendenze
+node_modules/
+
+# Python (rating_engine)
+__pycache__/
+*.py[cod]
+
+# Variabili d'ambiente (mai committare — si impostano su Netlify)
+.env
+.env.*
+
+# Log
+*.log
+npm-debug.log*
+
+# Cartelle di build/deploy locali
+.netlify/
+dist/
+
+# File di sistema
+.DS_Store
+Thumbs.db

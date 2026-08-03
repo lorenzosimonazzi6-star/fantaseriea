@@ -1,3 +1,9 @@
 User-agent: *
 Allow: /
-Sitemap: https://fanta-seriea.it/sitemap.xml
+Disallow: /.netlify/
+Disallow: /netlify/
+Disallow: /.env
+Disallow: /node_modules/
+
+# Sitemap
+Sitemap: https://fantaarena.it/seriea/sitemap.xml

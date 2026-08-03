@@ -1,12 +1,65 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+  command = "npm install"
+
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyDuAePQC0gf4VSqQrsITwDUOmCcg3ionGE"
 
 [[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://www.gstatic.com https://apis.google.com https://identitytoolkit.googleapis.com https://*.firebasedatabase.app https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com https://images.unsplash.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com https://www.gstatic.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
 
-# Scheduled function — gira ogni 5 minuti
+# Cache aggressivo per asset statici
+[[headers]]
+  for = "/style.css"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/logo.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, immutable"
+
+[[headers]]
+  for = "/app.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/i18n.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/matches.js"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=3600"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    # Service Worker non va cachato: il browser lo ricarica sempre
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=3600"
+
+# Redirect www → non-www (301 permanente)
+[[redirects]]
+  from = "https://www.fantaarena.it/*"
+  to   = "https://fantaarena.it/:splat"
+  status = 301
+  force  = true
+
+# Scheduled function — cron ogni minuto; shouldPoll guard gestisce la frequenza per fase
 [functions."scheduled-poller"]
-  schedule = "*/5 * * * *"
+  schedule = "*/1 * * * *"
