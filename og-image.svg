@@ -38,11 +38,11 @@
   <text x="130" y="260" font-size="110" font-family="Arial,sans-serif">⚽</text>
 
   <!-- FANTASY ARENA title -->
-  <text x="280" y="220" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="88" fill="white" letter-spacing="-2">FANTASY</text>
-  <text x="280" y="320" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="88" fill="url(#accent)" letter-spacing="-2">ARENA</text>
+  <text x="280" y="220" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="88" fill="white" letter-spacing="-2">ARENA</text>
+  <text x="280" y="320" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="88" fill="url(#accent)" letter-spacing="-2">SERIEA</text>
 
   <!-- Subtitle -->
-  <text x="280" y="380" font-family="Arial,sans-serif" font-weight="400" font-size="32" fill="#a0aec0" letter-spacing="2">FANTASY FOOTBALL · MONDIALI 2026</text>
+  <text x="280" y="380" font-family="Arial,sans-serif" font-weight="400" font-size="32" fill="#a0aec0" letter-spacing="2">FANTASY FOOTBALL · SERIE A 2026/27</text>
 
   <!-- Divider -->
   <rect x="280" y="410" width="120" height="3" fill="url(#accent)" rx="2"/>

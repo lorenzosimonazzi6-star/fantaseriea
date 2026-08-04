@@ -3479,12 +3479,6 @@ function renderSuperadminPage() {
         <div id="superVotiTable" class="voti-table-wrap"></div>
       </div>
       <div class="admin-card" style="grid-column:1/-1">
-        <h3>🚫 Club Eliminati</h3>
-        <p class="hint">Segna i club usciti dalla competizione. I loro giocatori appariranno barrati nelle rose e non potranno ricevere nuovi voti.</p>
-        <div id="superEliminateGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:12px"></div>
-        <button class="btn-primary" id="btnSuperSalvaEliminate" style="margin-top:16px">💾 Salva Eliminazioni</button>
-      </div>
-      <div class="admin-card" style="grid-column:1/-1">
         <h3>🔄 Migrazione Nomi Rose</h3>
         <p class="hint">Allinea i nomi dei giocatori in tutte le rose al database giocatori aggiornato. Usa questa funzione dopo aver ricaricato il CSV con i nomi corretti.</p>
         <button class="btn-primary" id="btnMigraNomiRose">🔄 Migra nomi rose</button>
@@ -3558,55 +3552,6 @@ function renderSuperadminPage() {
   sel.addEventListener("change", renderSuperVotiTable);
   document.getElementById("superSelectGiornata")?.addEventListener("change", renderSuperVotiTable);
   document.getElementById("superBtnSalvaVoti")?.addEventListener("click", saveSuperVoti);
-
-  // ── CLUB ELIMINATI ──────────────────────────────────────────
-  const elimGrid = document.getElementById("superEliminateGrid");
-  if (elimGrid) {
-    const eliminate = globalState.clubEliminati || {};
-    const ELIM_OPZIONI = [
-      { value: "",   label: "— Ancora in corsa —" },
-      { value: "8",  label: "League Phase (out dopo G8)" },
-      { value: "10", label: "Playoff (out dopo PO-R)" },
-      { value: "12", label: "Ottavi (out dopo R16-R)" },
-      { value: "14", label: "Quarti (out dopo QF-R)" },
-      { value: "16", label: "Semifinale (out dopo SF-R)" },
-    ];
-    const optsHtml = ELIM_OPZIONI.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
-    let gridHtml = "";
-    const clubList = typeof SQUADRE !== "undefined" ? SQUADRE : [];
-    for (const club of clubList) {
-      const val = eliminate[club] || "";
-      const isElim = !!val;
-      gridHtml += `<div class="elim-check-label${isElim ? " elim-active" : ""}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid ${isElim ? "var(--red)" : "var(--border)"};background:${isElim ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.03)"};border-radius:8px;font-size:13px;transition:all .15s">
-        <span style="flex:1;${isElim ? "text-decoration:line-through;opacity:.6" : ""}">${club}</span>
-        <select class="elim-sel" data-club="${club}" style="font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:2px 4px">
-          ${optsHtml}
-        </select>
-      </div>`;
-    }
-    elimGrid.innerHTML = gridHtml;
-    // Set current values and bind change styling
-    elimGrid.querySelectorAll("select.elim-sel").forEach(sel => {
-      sel.value = eliminate[sel.dataset.club] || "";
-      sel.addEventListener("change", function() {
-        const row = this.closest("div");
-        const nameSpan = row.querySelector("span");
-        const isElim = !!this.value;
-        row.style.borderColor = isElim ? "var(--red)" : "var(--border)";
-        row.style.background  = isElim ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.03)";
-        if (nameSpan) { nameSpan.style.textDecoration = isElim ? "line-through" : ""; nameSpan.style.opacity = isElim ? ".6" : ""; }
-      });
-    });
-    document.getElementById("btnSuperSalvaEliminate")?.addEventListener("click", () => {
-      const newElim = {};
-      elimGrid.querySelectorAll("select.elim-sel").forEach(sel => {
-        if (sel.value) newElim[sel.dataset.club] = sel.value;
-      });
-      globalState.clubEliminati = newElim;
-      saveGlobalState();
-      toast(`✓ ${Object.keys(newElim).length} club segnati come eliminati`);
-    });
-  }
 
   document.getElementById("btnMigraNomiRose")?.addEventListener("click", migraNomiRose);
 
