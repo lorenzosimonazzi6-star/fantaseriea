@@ -1171,16 +1171,15 @@ function renderVotiPage() {
   const adminCtrl = document.getElementById("votiAdminControls");
   const loginCtrl = document.getElementById("votiLoginControls");
   const btnSalva  = document.getElementById("btnSalvaVoti");
-  if (votiUnlocked) {
-    adminCtrl.style.display = "flex";
-    loginCtrl.style.display = "none";
-    btnSalva.style.display  = "inline-block";
-  } else {
-    adminCtrl.style.display = "none";
-    // Show login only as a small link, not a blocker
-    loginCtrl.style.display = "flex";
-    btnSalva.style.display  = "none";
-  }
+  // Voti gestiti centralmente (poller live + superadmin via ?sa=1 / Ctrl+Shift+S):
+  // pagina in sola lettura per gli admin di lega, perché le regole RTDB ora
+  // consentono la scrittura su /global solo all'account superadmin.
+  const note = document.getElementById("votiReadonlyNote");
+  votiUnlocked = false;
+  adminCtrl.style.display = "none";
+  loginCtrl.style.display = "none";
+  btnSalva.style.display  = "none";
+  if (note) note.style.display = "block";
   renderVoti();
 }
 
