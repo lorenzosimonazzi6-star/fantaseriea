@@ -354,7 +354,7 @@ function renderWinnerBanner() {
     const isWinner = p.punti === max;
     return `<div class="winner-podio-item${isWinner ? " winner-first" : ""}">
       <span class="winner-medal">${medals[i]}</span>
-      <span class="winner-podio-name">${p.nome}</span>
+      <span class="winner-podio-name">${_escHtml(p.nome)}</span>
       <span class="winner-podio-pts">${p.punti.toFixed(1)} pt</span>
     </div>`;
   }).join("");
@@ -367,7 +367,7 @@ function renderWinnerBanner() {
     <div class="winner-banner">
       <div class="winner-stars">★ ★ ★ ★ ★</div>
       <div class="winner-trophy">🏆</div>
-      <h2 class="winner-title">${titolo}</h2>
+      <h2 class="winner-title">${_escHtml(titolo)}</h2>
       <p class="winner-subtitle">Vincitore di <strong>${legaNome}</strong> · FIFA World Cup 2026</p>
       <div class="winner-score">${max.toFixed(1)} punti</div>
       <div class="winner-podio">${podioHtml}</div>
@@ -536,7 +536,7 @@ function renderClassifica() {
     const pendingDot = r.pending ? `<span class="pending-dot" title="Voti mancanti"></span>` : "";
     return `<tr class="${pos<=3?`rank-${pos}`:""} classifica-row-clickable" data-partid="${r.id}" title="Clicca per vedere la rosa">
       <td><span class="rank-num">${pos<=3?medals[i]:pos}</span></td>
-      <td><span class="partecipante-name">${r.nome}</span>${pendingDot}</td>
+      <td><span class="partecipante-name">${_escHtml(r.nome)}</span>${pendingDot}</td>
       <td><span class="punti-g">${r.gPts.toFixed(1)}</span></td>
       <td><span class="punti-tot">${r.totPts.toFixed(1)}</span></td>
     </tr>`;
@@ -751,7 +751,7 @@ function renderStats() {
             const pct = Math.round((g.count / totalParts) * 100);
             return `<div class="stats-own-row">
               <span class="stats-own-rank">${i + 1}</span>
-              <span class="stats-own-name">${g.nome}</span>
+              <span class="stats-own-name">${_escHtml(g.nome)}</span>
               <span class="stats-own-flag">${_ruoloIcon(g.ruolo)}</span>
               <span class="stats-own-naz">${g.nazione}</span>
               <div class="stats-own-bar-wrap"><div class="stats-own-bar" style="width:${pct}%"></div></div>
@@ -771,7 +771,7 @@ function renderStats() {
                 const pct = Math.round((d.count / totalParts) * 100);
                 return `<div class="stats-cap-row">
                   <span class="stats-rank-num">${i + 1}</span>
-                  <span class="stats-cap-name">${nome}</span>
+                  <span class="stats-cap-name">${_escHtml(nome)}</span>
                   <span class="stats-cap-pct">${d.count}/${totalParts} · ${pct}%</span>
                 </div>`;
               }).join("")}
@@ -786,7 +786,7 @@ function renderStats() {
         <div class="stats-naz-scelte-list">
           ${nazioniOrdinate.map(({ naz, picks, unique }) => {
             const picksHtml = picks.map(([nome, cnt]) =>
-              `<span class="stats-naz-pick ${cnt === picks[0][1] ? "top" : ""}">${nome} <em>${cnt}</em></span>`
+              `<span class="stats-naz-pick ${cnt === picks[0][1] ? "top" : ""}">${_escHtml(nome)} <em>${cnt}</em></span>`
             ).join("");
             return `<div class="stats-naz-scelta-row">
               <span class="stats-naz-scelta-naz">${naz}</span>
@@ -809,7 +809,7 @@ function renderStats() {
                   <div class="stats-scorer-row">
                     <span class="stats-rank-num">${i + 1}</span>
                     <span class="stats-own-flag">${_ruoloIcon(g.ruolo)}</span>
-                    <span class="stats-scorer-name">${g.nome}</span>
+                    <span class="stats-scorer-name">${_escHtml(g.nome)}</span>
                     <span class="stats-scorer-naz">${g.nazione}</span>
                     <span class="stats-scorer-pts">${g.pts.toFixed(1)}</span>
                   </div>
@@ -830,7 +830,7 @@ function renderStats() {
                   <div class="stats-scorer-row">
                     <span class="stats-rank-num">${i + 1}</span>
                     <span class="stats-own-flag">${_ruoloIcon(c.capRuolo)}</span>
-                    <span class="stats-scorer-name">${c.capNome}</span>
+                    <span class="stats-scorer-name">${_escHtml(c.capNome)}</span>
                     ${c.count > 1 ? `<span class="stats-scorer-sub">×${c.count}</span>` : `<span class="stats-scorer-sub"></span>`}
                     <span class="stats-scorer-naz">${c.capNazione || ""}</span>
                     <span class="stats-scorer-pts">${c.pts.toFixed(1)}</span>
@@ -850,7 +850,7 @@ function renderStats() {
                 const cls = item.svCount === 0 ? "stats-sv-zero" : item.svCount <= 3 ? "stats-sv-mid" : "stats-sv-high";
                 return `<div class="stats-scorer-row">
                   <span class="stats-rank-num">${i + 1}</span>
-                  <span class="stats-scorer-name">${item.p.nome}</span>
+                  <span class="stats-scorer-name">${_escHtml(item.p.nome)}</span>
                   <span class="stats-sv-count ${cls}">${item.svCount}</span>
                 </div>`;
               }).join("")}
@@ -872,7 +872,7 @@ function renderStats() {
               ${bonusMalusPerPart.map((item, i) => `
                 <div class="stats-bm-row">
                   <span class="stats-rank-num">${i + 1}</span>
-                  <span class="stats-bm-nome">${item.p.nome}</span>
+                  <span class="stats-bm-nome">${_escHtml(item.p.nome)}</span>
                   <span class="stats-bm-bns">+${item.totalBonus.toFixed(1)}</span>
                   <span class="stats-bm-mls">${item.totalMalus > 0 ? `-${item.totalMalus.toFixed(1)}` : "–"}</span>
                 </div>
@@ -900,7 +900,7 @@ function renderStats() {
                   ${sostArr.map(s => {
                     const outNome = s.outNome || s.out || "?";
                     const inNome  = s.inNome  || s.in  || "?";
-                    return `<span class="stats-sost-swap">${_ruoloIcon(s.ruolo)} <span class="out">${outNome}</span> → <span class="in">${inNome}</span></span>`;
+                    return `<span class="stats-sost-swap">${_ruoloIcon(s.ruolo)} <span class="out">${_escHtml(outNome)}</span> → <span class="in">${_escHtml(inNome)}</span></span>`;
                   }).join("")}
                 </div>
               </div>`;
@@ -908,7 +908,7 @@ function renderStats() {
             const pct = Math.round(totalUsed / MAX_SOST_TOTALI * 100);
             return `<div class="stats-sost-row">
               <div class="stats-sost-header">
-                <span class="stats-sost-nome">${p.nome}</span>
+                <span class="stats-sost-nome">${_escHtml(p.nome)}</span>
                 <span class="stats-sost-count ${totalUsed === MAX_SOST_TOTALI ? "full" : totalUsed >= MAX_SOST_TOTALI - 1 ? "low" : ""}">${totalUsed}/${MAX_SOST_TOTALI}</span>
               </div>
               <div class="stats-sost-bar-wrap"><div class="stats-sost-bar ${totalUsed === MAX_SOST_TOTALI ? "full" : ""}" style="width:${pct}%"></div></div>
@@ -958,7 +958,7 @@ function renderStats() {
       }
       const giocatori = [...seen.entries()].map(([nome, ruolo]) => ({ nome, ruolo })).sort((a, b) => a.nome.localeCompare(b.nome));
       selPlayer.innerHTML = `<option value="">– Giocatore –</option>` +
-        giocatori.map(g => `<option value="${g.nome}" data-ruolo="${g.ruolo}">${g.nome}</option>`).join("");
+        giocatori.map(g => `<option value="${_escHtml(g.nome)}" data-ruolo="${g.ruolo}">${_escHtml(g.nome)}</option>`).join("");
       selPlayer.disabled = false;
     });
 
@@ -985,7 +985,7 @@ function renderStats() {
       }
       resEl.innerHTML = `<table class="stats-search-table">
         <thead><tr><th>#</th><th>Partecipante</th></tr></thead>
-        <tbody>${owners.map((n, i) => `<tr><td>${i + 1}</td><td>${n}</td></tr>`).join("")}</tbody>
+        <tbody>${owners.map((n, i) => `<tr><td>${i + 1}</td><td>${_escHtml(n)}</td></tr>`).join("")}</tbody>
       </table>`;
     });
   }
@@ -1013,7 +1013,7 @@ function buildGiornata() {
   document.getElementById("giornataSummary").innerHTML = scored.map((item, i) => {
     return `<div class="summary-chip${i===0?" top":""}" data-scroll="${item.p.id}">
       ${item.pending?'<span class="chip-elim" title="Voti mancanti">⚠</span>':""}
-      <span class="summary-chip-name">${item.p.nome}</span>
+      <span class="summary-chip-name">${_escHtml(item.p.nome)}</span>
       <span class="summary-chip-pts">${item.pts.toFixed(1)}</span>
     </div>`;
   }).join("");
@@ -1091,7 +1091,7 @@ function buildGiornata() {
           const elimBadge = elimNaz ? ' <span title="Club eliminato" style="font-size:10px;text-decoration:none;display:inline-block">🚫</span>' : "";
 
           return `<tr${isSV?' class="sv"':''}${elimNaz?' class="elim-row"':""}>
-            <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${elimStyle}">${g.nome}${capBadge}${elimBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
+            <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${elimStyle}">${_escHtml(g.nome)}${capBadge}${elimBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
             <td style="font-size:12px;text-align:center">${isSV?'<span class="sv-text" style="font-size:11px">SV</span>':v!==null?`<span class="voto-num">${v.toFixed(1)}</span>`:pending?'<span style="color:var(--orange);font-size:11px;font-weight:700">?</span>':'<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? mlsCell : '<span class="voto-dash">–</span>'}</td>
             <td style="font-size:12px;text-align:center">${v!==null ? bnsCell : '<span class="voto-dash">–</span>'}</td>
@@ -1122,7 +1122,7 @@ function buildGiornata() {
     return `<div class="acc-item" id="acc_${p.id}" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
       <div class="acc-header" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s;" data-id="${p.id}">
         <span style="font-family:'Outfit',sans-serif;font-size:18px;color:${rankColor(i)};flex-shrink:0">${i<3?medals[i]:i+1}</span>
-        <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nome}${lockIcon}${pendingWarn}</span>
+        <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escHtml(p.nome)}${lockIcon}${pendingWarn}</span>
         <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;color:var(--accent);flex-shrink:0">${item.pts.toFixed(1)}</span>
         <span class="acc-chevron" style="font-size:12px;color:var(--text2);flex-shrink:0;transition:transform .25s">▼</span>
       </div>
@@ -1319,11 +1319,11 @@ function renderVotiTable() {
 
     return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"${isSV?' class="sv-row"':""}>
       <td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td>
-      <td style="font-weight:600;font-size:14px">${g.nome}</td>
+      <td style="font-weight:600;font-size:14px">${_escHtml(g.nome)}</td>
       <td class="center">${vInput}${svBtn}</td>
       <td><div class="flags-wrap">${flagsHtml}</div></td>
       <td class="center"><span class="totale-voto-cell${totCls}" id="vtot_${safeId(g.nome)}">${isSV?"SV":v!==""?tot.toFixed(1):"–"}</span></td>
-      ${isEdit?`<td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center"><button class="btn-icon" data-delvoto="${g.nome}" title="Elimina voto" style="color:var(--orange)">✕</button><button class="btn-icon" data-rm="${g.nome}" title="Rimuovi giocatore">🗑</button></td>`:"<td></td>"}
+      ${isEdit?`<td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center"><button class="btn-icon" data-delvoto="${_escHtml(g.nome)}" title="Elimina voto" style="color:var(--orange)">✕</button><button class="btn-icon" data-rm="${_escHtml(g.nome)}" title="Rimuovi giocatore">🗑</button></td>`:"<td></td>"}
     </tr>`;
   }).join("");
 
@@ -1520,7 +1520,7 @@ function renderAdmin(){
     const nome=currentLegaMeta?.nome||currentLegaId;
     const waMsg=encodeURIComponent(`🏆 Entra nella mia lega ArenaSerieA "${nome}" per la Serie A 2026/27!\n👉 ${link}`);
     banner.innerHTML=`
-      <span>🏆 <strong>${nome}</strong> · <span style="font-size:11px;opacity:.7">${currentLegaId}</span></span>
+      <span>🏆 <strong>${_escHtml(nome)}</strong> · <span style="font-size:11px;opacity:.7">${currentLegaId}</span></span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn-sec" style="font-size:11px;padding:3px 10px"
           onclick="navigator.clipboard.writeText('${link}').then(()=>toast('📋 Link copiato!'))">📋 Copia link</button>
@@ -1530,7 +1530,7 @@ function renderAdmin(){
           WhatsApp
         </a>
         ${navigator.share ? `<button class="btn-sec" style="font-size:11px;padding:3px 10px"
-          onclick="navigator.share({title:'ArenaSerieA – ${nome}',text:'Entra nella mia lega ArenaSerieA per la Serie A 2026/27!',url:'${link}'}).catch(()=>{})">↗ Condividi</button>` : ''}
+          onclick="navigator.share({title:'ArenaSerieA – ${_escHtml(nome).replace(/'/g,"\\'")}',text:'Entra nella mia lega ArenaSerieA per la Serie A 2026/27!',url:'${link}'}).catch(()=>{})">↗ Condividi</button>` : ''}
       </div>`;
     banner.style.display="flex";
   }
@@ -1667,7 +1667,7 @@ function renderPartecipantiList() {
   list.innerHTML = state.partecipanti.map(p => {
     const hasRosa = state.rose[p.id] && Object.values(state.rose[p.id]).some(a=>a.length);
     return `<div class="partecipante-item">
-      <span>${p.nome}</span>
+      <span>${_escHtml(p.nome)}</span>
       <div class="part-item-actions">
         <span class="${hasRosa?"rosa-loaded":"rosa-missing"}">${hasRosa?"✓ Rosa caricata":"✗ Rosa mancante"}</span>
         <button class="btn-del" data-id="${p.id}">✕</button>
@@ -1718,10 +1718,10 @@ function renderCapitanoForm() {
     const rosa=state.rose[p.id];
     const nonAtt=rosa?Object.entries(rosa).flatMap(([r,arr])=>r!=="A"?arr.map(g=>({...g,ruolo:r})):[]): [];
     const opts=nonAtt.length
-      ?nonAtt.map(g=>`<option value="${g.nome}" ${p.capitanoGiocatore===g.nome?"selected":""}>${g.nome} (${g.ruolo}) – ${g.nazione}</option>`).join("")
+      ?nonAtt.map(g=>`<option value="${_escHtml(g.nome)}" ${p.capitanoGiocatore===g.nome?"selected":""}>${_escHtml(g.nome)} (${g.ruolo}) – ${g.nazione}</option>`).join("")
       :"<option value=''>Carica prima la rosa</option>";
     return `<div class="capitano-row">
-      <span>${p.nome}</span>
+      <span>${_escHtml(p.nome)}</span>
       <select data-pid="${p.id}" class="sel-cap"><option value="">– Nessuno –</option>${opts}</select>
     </div>`;
   }).join("");
@@ -1896,7 +1896,7 @@ function buildManualForm(partId) {
   form.innerHTML=Object.entries(RUOLI).map(([ruolo,nome])=>{
     const rows=(rosa[ruolo]||[]).map((g,i)=>manualRow(ruolo,i,g.nome,g.nazione)).join("");
     return `<div class="manual-ruolo-section" data-ruolo="${ruolo}">
-      <div class="manual-ruolo-title"><span class="ruolo-badge ruolo-${ruolo}">${ruolo}</span><span>${nome}</span></div>
+      <div class="manual-ruolo-title"><span class="ruolo-badge ruolo-${ruolo}">${ruolo}</span><span>${_escHtml(nome)}</span></div>
       <div class="manual-giocatori-list" id="manList_${ruolo}">${rows}</div>
       <button class="btn-add-gioc" data-add="${ruolo}">+ Aggiungi ${ruolo}</button>
     </div>`;
@@ -1914,7 +1914,7 @@ function buildManualForm(partId) {
 function manualRow(ruolo,idx,nome,nazione) {
   const opts=SQUADRE.map(n=>`<option value="${n}" ${n===nazione?"selected":""}>${n}</option>`).join("");
   return `<div class="manual-gioc-row" data-ruolo="${ruolo}">
-    <input type="text" class="inp-man-nome" placeholder="Nome giocatore" value="${nome}">
+    <input type="text" class="inp-man-nome" placeholder="Nome giocatore" value="${_escHtml(nome)}">
     <select class="inp-man-naz"><option value="">– Nazione –</option>${opts}</select>
     <button class="btn-rm-gioc" type="button">✕</button>
   </div>`;
@@ -2032,7 +2032,7 @@ function renderGrafico() {
     );
     const color = isMe ? "#e8ff3a" : palette[ci % palette.length];
     return {
-      label: isMe ? `⭐ ${p.nome}` : p.nome,
+      label: isMe ? `⭐ ${_escHtml(p.nome)}` : p.nome,
       data,
       borderColor: color,
       backgroundColor: color + "20",
@@ -2063,7 +2063,7 @@ function renderGrafico() {
     `<button class="grafico-filter-btn${_graficoFilterMode === mode ? " grafico-filter-btn--active" : ""}" data-mode="${mode}">${label}</button>`
   ).join("");
   const meBadge = myPart && !meInTop
-    ? `<span class="grafico-me-badge">+ ${myPart.nome} (tu)</span>` : "";
+    ? `<span class="grafico-me-badge">+ ${_escHtml(myPart.nome)} (tu)</span>` : "";
 
   if (_graficoChart) { _graficoChart.destroy(); _graficoChart = null; }
 
@@ -2561,7 +2561,7 @@ function renderSostituzioni() {
 
   // ── Filtro partecipante ──
   const partOpts = state.partecipanti.map(p =>
-    `<option value="${p.id}" ${_sostSelectedPart===p.id?"selected":""}>${p.nome}</option>`
+    `<option value="${p.id}" ${_sostSelectedPart===p.id?"selected":""}>${_escHtml(p.nome)}</option>`
   ).join("");
 
   const filterBar = `<div class="sost-filter-bar">
@@ -2601,9 +2601,9 @@ function renderSostituzioni() {
         <span class="sost-finestra-badge">F${f.id}</span>
         <span class="ruolo-badge ruolo-${s.ruolo}">${s.ruolo}</span>
         ${typeBadge}
-        <span class="sost-out">▼ ${outNome}</span>
+        <span class="sost-out">▼ ${_escHtml(outNome)}</span>
         <span class="sost-arrow">→</span>
-        <span class="sost-in">▲ ${inNome}</span>
+        <span class="sost-in">▲ ${_escHtml(inNome)}</span>
         <span class="sost-naz">(${naz})</span>
         <button class="sost-edit-admin" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Modifica">✏️</button>
         <button class="btn-del sost-del" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Elimina">🗑️</button>
@@ -2706,7 +2706,7 @@ function renderSostituzioni() {
   div.innerHTML = filterBar +
     `<div class="sost-partecipante-block">
       <div class="sost-part-header">
-        <span class="sost-part-nome">${p.nome}</span>
+        <span class="sost-part-nome">${_escHtml(p.nome)}</span>
         <span class="sost-counter ${totRim===0?"zero":totRim<=1?"low":""}">${totUsate}/${MAX_SOST_TOTALI} sostituzioni usate</span>
       </div>
       ${storicoRows ? `<div class="sost-storico">${storicoRows}</div>` : ""}
@@ -2752,7 +2752,7 @@ function populateSostOut(ruoloSel) {
   outSel.innerHTML = `<option value="">– Seleziona –</option>` +
     (rosa[ruolo] || [])
       .filter(g => g.nome !== capitanoNomeAdmin)  // il capitano non può essere sostituito
-      .map(g => `<option value="${g.nome}" data-naz="${g.nazione}">${g.nome} (${g.nazione})</option>`)
+      .map(g => `<option value="${_escHtml(g.nome)}" data-naz="${g.nazione}">${_escHtml(g.nome)} (${g.nazione})</option>`)
       .join("");
   inSel.innerHTML = `<option value="">– prima seleziona OUT –</option>`;
 
@@ -2772,7 +2772,7 @@ function populateSostOut(ruoloSel) {
     // Tutti i giocatori noti stessa nazione + ruolo, escluso OUT
     const candidati = getGiocatoriNazioneRuolo(naz, ruolo, this.value);
     inSel.innerHTML = `<option value="">– Seleziona –</option>` +
-      candidati.map(g => `<option value="${g.nome}">${g.nome}</option>`).join("") +
+      candidati.map(g => `<option value="${_escHtml(g.nome)}">${_escHtml(g.nome)}</option>`).join("") +
       `<option value="__nuovo__">✏️ Nuovo giocatore...</option>`;
 
     // Update nuovo box labels
@@ -2915,7 +2915,7 @@ function populateSel(id,items,labelKey,valueKey,placeholder,placeholderVal) {
   if (!sel) return;
   const prev=sel.value;
   sel.innerHTML=`<option value="${placeholderVal}">${placeholder}</option>`+
-    items.map(i=>`<option value="${i[valueKey]}">${i[labelKey]}</option>`).join("");
+    items.map(i=>`<option value="${_escHtml(i[valueKey])}">${_escHtml(i[labelKey])}</option>`).join("");
   if (prev) sel.value=prev;
 }
 function safeId(str){return str.replace(/[^a-zA-Z0-9]/g,"_");}
@@ -2979,8 +2979,8 @@ function renderSidebar() {
     let html = `<div class="sidebar-profile">
       <div class="sidebar-avatar">${(currentUser.displayName||currentUser.email||"U")[0].toUpperCase()}</div>
       <div class="sidebar-user-info">
-        <div class="sidebar-username">${currentUser.displayName || "Utente"}</div>
-        <div class="sidebar-email">${currentUser.email}</div>
+        <div class="sidebar-username">${_escHtml(currentUser.displayName || "Utente")}</div>
+        <div class="sidebar-email">${_escHtml(currentUser.email)}</div>
       </div>
     </div>
     <hr class="sidebar-divider">
@@ -3009,7 +3009,7 @@ function renderSidebar() {
             return;
           }
           list.innerHTML = userLeghe.map(([id, l]) => `
-            <div class="sidebar-lega-item${currentLegaId===id?" active":""}" data-id="${id}" data-state='${JSON.stringify(l.state||{})}' data-meta='${JSON.stringify(l.meta||{})}'>
+            <div class="sidebar-lega-item${currentLegaId===id?" active":""}" data-id="${id}" data-state="${_escHtml(JSON.stringify(l.state||{}))}" data-meta="${_escHtml(JSON.stringify(l.meta||{}))}">
               <span class="sidebar-lega-name">${l.meta?.nome||id}</span>
               <span class="sidebar-lega-badge">${l.meta?.pubblica?"🌍":"🔒"}</span>
               ${l.meta?.adminUid===currentUser.uid?'<span class="sidebar-lega-admin">👑</span>':""}
@@ -3606,7 +3606,7 @@ function renderSuperadminPage() {
       const naz = aliasNazioneEl.value;
       if (!naz) { aliasDbNameEl.innerHTML = `<option value="">– prima seleziona nazione –</option>`; aliasDbNameEl.disabled = true; return; }
       const players = (globalState.giocatoriSquadra?.[naz] || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
-      aliasDbNameEl.innerHTML = `<option value="">– Giocatore –</option>` + players.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("");
+      aliasDbNameEl.innerHTML = `<option value="">– Giocatore –</option>` + players.map(p => `<option value="${_escHtml(p.nome)}">${_escHtml(p.nome)}</option>`).join("");
       aliasDbNameEl.disabled = false;
     });
 
@@ -3643,7 +3643,7 @@ function renderSuperadminPage() {
       aliasOrfaniList.innerHTML = [...seen.values()].map(o => {
         const playerOpts = (globalState.giocatoriSquadra?.[o.naz] || [])
           .slice().sort((a, b) => a.nome.localeCompare(b.nome))
-          .map(p => `<option value="${p.nome}">${p.nome}</option>`).join("");
+          .map(p => `<option value="${_escHtml(p.nome)}">${_escHtml(p.nome)}</option>`).join("");
         return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px;background:rgba(255,100,0,.08);border:1px solid rgba(255,100,0,.2);border-radius:8px;margin-bottom:6px">
           <span style="font-size:12px;color:var(--text2)">${o.naz} ${o.giornate.join(" ")}</span>
           <span style="font-weight:700;color:var(--accent2)">${o.key}</span>
@@ -3707,7 +3707,7 @@ function renderSuperadminPage() {
         <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Mostra anteprima (prime 5 squadre)</summary>
         <div style="font-size:12px;margin-top:8px;max-height:260px;overflow:auto">
           ${Object.entries(result.db).slice(0,5).map(([sq,gioc]) =>
-            `<strong>${sq}</strong>: ${gioc.map(g=>`${g.nome} (${g.ruolo})`).join(', ')}`
+            `<strong>${sq}</strong>: ${gioc.map(g=>`${_escHtml(g.nome)} (${g.ruolo})`).join(', ')}`
           ).join('<br>')}
         </div>
       </details>`;
@@ -3987,7 +3987,7 @@ function renderSuperVotiTable() {
       if (f.multi) { const cnt = val || 0; return `<span class="flag-multi-wrap ${f.cls}${cnt > 0 ? " active" : ""}" data-flag="${f.key}" data-nome="${safeKey(g.nome)}"><button class="flag-multi-dec" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" ${cnt === 0 ? "disabled" : ""}>−</button><span class="flag-multi-label">${f.label.split(" ")[0]} <span class="flag-multi-count">${cnt}</span></span><button class="flag-multi-inc" data-flag="${f.key}" data-nome="${safeKey(g.nome)}">+</button></span>`; }
       return `<button class="flag-btn ${f.cls}${val ? " active" : ""}" data-flag="${f.key}" data-multi="false" data-nome="${safeKey(g.nome)}">${f.label}</button>`;
     }).join("");
-    return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"><td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td><td style="font-weight:600">${fromSofa ? '<span title="Voto Sofascore" style="font-size:10px;margin-right:4px">🔴</span>' : ""}${g.nome}</td><td class="center"><input type="number" class="inp-v" data-nome="${safeKey(g.nome)}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV ? "disabled style='opacity:.4'" : ""}><button class="sv-btn${isSV ? " active" : ""}" data-nome="${safeKey(g.nome)}">SV</button></td><td><div class="flags-wrap">${fh}</div></td><td class="center"><span class="totale-voto-cell${tot < 0 ? " totale-voto-neg" : ""}" id="svtot_${safeId(g.nome)}">${isSV ? "SV" : v !== "" ? tot.toFixed(1) : "–"}</span></td><td class="center"><button class="btn-icon" data-svdel="${safeKey(g.nome)}" style="color:var(--orange)">✕</button></td></tr>`;
+    return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"><td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td><td style="font-weight:600">${fromSofa ? '<span title="Voto Sofascore" style="font-size:10px;margin-right:4px">🔴</span>' : ""}${_escHtml(g.nome)}</td><td class="center"><input type="number" class="inp-v" data-nome="${safeKey(g.nome)}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV ? "disabled style='opacity:.4'" : ""}><button class="sv-btn${isSV ? " active" : ""}" data-nome="${safeKey(g.nome)}">SV</button></td><td><div class="flags-wrap">${fh}</div></td><td class="center"><span class="totale-voto-cell${tot < 0 ? " totale-voto-neg" : ""}" id="svtot_${safeId(g.nome)}">${isSV ? "SV" : v !== "" ? tot.toFixed(1) : "–"}</span></td><td class="center"><button class="btn-icon" data-svdel="${safeKey(g.nome)}" style="color:var(--orange)">✕</button></td></tr>`;
   }).join("");
   wrap.innerHTML = `<table class="voti-table"><thead><tr><th>R.</th><th>Giocatore</th><th class="center">Voto</th><th>Bonus/Malus</th><th class="center">Tot</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   function updTot(row) {
@@ -4200,7 +4200,7 @@ function renderLobby() {
     if (user) {
       html += `<div class="lobby-section lobby-user-section">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span>👤 <strong>${user.displayName || user.email}</strong></span>
+          <span>👤 <strong>${_escHtml(user.displayName || user.email)}</strong></span>
           <button class="btn-sec" id="btnSignOut" style="font-size:12px;padding:5px 12px">Esci dall'account</button>
         </div>
       </div>`;
@@ -4654,7 +4654,7 @@ function _renderGiocTabellone() {
         ${giocatori.map(g => `
           <div class="gioc-player-row gioc-role-${g.ruolo.toLowerCase()}">
             <span class="gioc-role-badge">${RUOLO_ICON[g.ruolo] || g.ruolo}</span>
-            <span class="gioc-player-name">${g.nome}</span>
+            <span class="gioc-player-name">${_escHtml(g.nome)}</span>
             <span class="gioc-role-label">${RUOLO_LABEL[g.ruolo] || g.ruolo}</span>
           </div>`).join("")}
       </div>
@@ -4873,7 +4873,7 @@ function renderSostSelfService() {
   const rosaHtml = effectiveRosa ? `<div class="my-rosa-section">
     <div class="my-rosa-header">
       <span class="my-rosa-title">La mia rosa</span>
-      ${partNome ? `<span style="font-size:12px;color:var(--text2)">${partNome}</span>` : ''}
+      ${partNome ? `<span style="font-size:12px;color:var(--text2)">${_escHtml(partNome)}</span>` : ''}
     </div>
     ${['P','D','C','A'].map(r => {
       const players = effectiveRosa[r] || [];
@@ -4882,7 +4882,7 @@ function renderSostSelfService() {
         <div class="my-rosa-ruolo-label">${_ruoloIcon(r)} ${_ruoloLabel(r)}</div>
         <div class="my-rosa-players">
           ${players.map(g => `<span class="my-rosa-player${g.nome === capitano ? ' my-rosa-cap' : ''}">
-            <span class="my-rosa-nome">${g.nome === capitano ? '⭐ ' : ''}${g.nome}</span><span class="my-rosa-naz">${g.nazione}</span>
+            <span class="my-rosa-nome">${g.nome === capitano ? '⭐ ' : ''}${_escHtml(g.nome)}</span><span class="my-rosa-naz">${g.nazione}</span>
           </span>`).join('')}
         </div>
       </div>`;
@@ -4935,9 +4935,9 @@ function renderSostSelfService() {
       ${sosts.map((s, idx) => {
         const isBeingEdited = editMode && _sostEditMode.finestraId === fId && _sostEditMode.idx === idx;
         return `<div class="sost-history-row${isBeingEdited ? ' sost-row-editing' : ''}">
-          <span class="sost-out">${_ruoloIcon(s.ruolo)} ${s.outNome} <span class="sost-naz">${s.outNazione}</span></span>
+          <span class="sost-out">${_ruoloIcon(s.ruolo)} ${_escHtml(s.outNome)} <span class="sost-naz">${s.outNazione}</span></span>
           <span class="sost-arrow">→</span>
-          <span class="sost-in">${_ruoloIcon(s.ruolo)} ${s.inNome} <span class="sost-naz">${s.inNazione}</span></span>
+          <span class="sost-in">${_ruoloIcon(s.ruolo)} ${_escHtml(s.inNome)} <span class="sost-naz">${s.inNazione}</span></span>
           ${canEdit ? `<button class="sost-edit-btn" data-fid="${fId}" data-idx="${idx}" title="Modifica">✏️</button><button class="sost-delete-btn" data-fid="${fId}" data-idx="${idx}" title="Elimina">🗑️</button>` : ''}
         </div>`;
       }).join('')}
@@ -5057,7 +5057,7 @@ function _buildOutOptions(ruolo, rosaBase, capitanoNome) {
   const arr = rosaBase[ruolo] || [];
   return arr
     .filter(g => g.nome !== capitanoNome)  // il capitano non può essere sostituito
-    .map(g => `<option value="${g.nome}|${g.nazione}">${g.nome} (${g.nazione})</option>`)
+    .map(g => `<option value="${_escHtml(g.nome)}|${g.nazione}">${_escHtml(g.nome)} (${g.nazione})</option>`)
     .join('');
 }
 
@@ -5280,7 +5280,7 @@ function _renderSquadraPicker() {
       data-nome="${g.nome.replace(/"/g,'&quot;')}" data-naz="${g.nazione.replace(/"/g,'&quot;')}"
       data-ruolo="${ruolo}" ${disabled?'data-disabled="1"':''}>
       <span class="squadra-picker-naz">${g.nazione}</span>
-      <span class="squadra-picker-nome">${g.nome}</span>
+      <span class="squadra-picker-nome">${_escHtml(g.nome)}</span>
       ${inRosa ? '<span class="squadra-picker-check">✓</span>' : ''}
     </div>`;
   }).join('');
@@ -5308,7 +5308,7 @@ function _renderSquadraRosa() {
     <div class="squadra-rosa-item${isCap ? ' is-captain' : ''}">
       <span class="squadra-rosa-num">${i+1}</span>
       <span class="squadra-rosa-naz">${g.nazione}</span>
-      <span class="squadra-rosa-nome">${g.nome}</span>
+      <span class="squadra-rosa-nome">${_escHtml(g.nome)}</span>
       ${canBeCap ? `<button class="squadra-rosa-cap${isCap ? ' active' : ''}"
         data-cnome="${nomeQ}" data-cnaz="${nazQ}" data-cruolo="${ruolo}"
         title="${isCap ? 'Rimuovi capitano' : 'Imposta come capitano'}">⭐</button>` : ''}
@@ -5333,7 +5333,7 @@ function _renderSquadraCapitano() {
   if (cap) {
     listEl.innerHTML = `<div class="squadra-cap-summary selected">
       <span class="squadra-cap-summary-role">${_ruoloIcon(cap.ruolo)}</span>
-      <span class="squadra-cap-summary-name">⭐ ${cap.nome}</span>
+      <span class="squadra-cap-summary-name">⭐ ${_escHtml(cap.nome)}</span>
       <span class="squadra-cap-summary-naz">${cap.nazione}</span>
       <button class="squadra-cap-remove-btn"
         data-cnome="${cap.nome.replace(/"/g,'&quot;')}"
@@ -5494,7 +5494,7 @@ async function _salvaSquadra() {
   for (const [r, arr] of Object.entries(bozza)) {
     for (const g of arr) {
       if (nazViste.has(g.nazione)) {
-        conflitto = `Hai due giocatori di ${g.nazione}: ${nazViste.get(g.nazione)} e ${g.nome}!`;
+        conflitto = `Hai due giocatori di ${g.nazione}: ${nazViste.get(g.nazione)} e ${_escHtml(g.nome)}!`;
         break;
       }
       nazViste.set(g.nazione, g.nome);
