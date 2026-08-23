@@ -36,6 +36,10 @@ function normalizeGiocatoriSquadra(obj) {
 }
 
 const SUPERADMIN_PWD_HASH="b056fab42da260419217a7de0a31d107bd6fd385d5b3a03f9f168e7ec90d0d05";
+// Gate REALE del pannello superadmin: deve combaciare con l'uid autorizzato a
+// scrivere /global nelle regole RTDB. La password da sola (hash nel sorgente)
+// non è un confine di sicurezza.
+const SUPERADMIN_UID="hX8e2E722gTCpypcHthWdj4z4M23";
 let superadminUnlocked=false;
 let currentLegaId=null;
 let currentLegaMeta=null;
@@ -1188,7 +1192,7 @@ document.getElementById("pwdInput")?.addEventListener("keydown", e => { if(e.key
 async function unlockVoti(){
   const val=document.getElementById("pwdInput").value;
   const hash=await sha256(val);
-  if(hash===SUPERADMIN_PWD_HASH){superadminUnlocked=true;navigate("superadmin");return;}
+  if(hash===SUPERADMIN_PWD_HASH && currentUser?.uid===SUPERADMIN_UID){superadminUnlocked=true;navigate("superadmin");return;}
   if(hash===state.pwdHash){votiUnlocked=true;renderVotiPage();}
   else{document.getElementById("pwdError").textContent="❌ Password errata";document.getElementById("pwdInput").value="";}
 }
@@ -4351,7 +4355,7 @@ function renderLobby() {
     document.getElementById("btnSuperSubmit")?.addEventListener("click", async () => {
       const val = document.getElementById("superPwdInput").value;
       const hash = await sha256(val);
-      if (hash === SUPERADMIN_PWD_HASH) {
+      if (hash === SUPERADMIN_PWD_HASH && currentUser?.uid === SUPERADMIN_UID) {
         superadminUnlocked = true;
         // Show nav
         const nl=document.querySelector(".nav-links"); if(nl) nl.style.display="";
@@ -4361,7 +4365,7 @@ function renderLobby() {
         if(lobby){lobby.classList.remove("active");lobby.style.display="none";}
         // Navigate to superadmin
         navigate("superadmin");
-      } else { document.getElementById("superPwdError").textContent = "❌ Password errata"; }
+      } else { document.getElementById("superPwdError").textContent = hash === SUPERADMIN_PWD_HASH ? "Accedi con l'account amministratore." : "❌ Password errata"; }
     });
     document.getElementById("superPwdInput")?.addEventListener("keydown", e => {
       if (e.key === "Enter") document.getElementById("btnSuperSubmit")?.click();
@@ -4503,7 +4507,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnSuperModalSubmit")?.addEventListener("click", async () => {
     const val = document.getElementById("superModalPwd").value;
     const hash = await sha256(val);
-    if (hash === SUPERADMIN_PWD_HASH) {
+    if (hash === SUPERADMIN_PWD_HASH && currentUser?.uid === SUPERADMIN_UID) {
       superadminUnlocked = true;
       document.getElementById("superadminModal").style.display = "none";
       document.getElementById("superModalPwd").value = "";
@@ -4512,7 +4516,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("hamburger").style.display = "flex";
       navigate("superadmin");
     } else {
-      document.getElementById("superModalErr").textContent = "❌ Password errata";
+      document.getElementById("superModalErr").textContent = hash === SUPERADMIN_PWD_HASH ? "Accedi con l'account amministratore." : "❌ Password errata";
     }
   });
   document.getElementById("superModalPwd")?.addEventListener("keydown", e => {
