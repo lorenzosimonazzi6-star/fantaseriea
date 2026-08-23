@@ -6,7 +6,7 @@
 // invalidare la cache vecchia.
 // ============================================================
 
-const CACHE_VERSION = "asa-v8";
+const CACHE_VERSION = "asa-v9";
 const CACHE_STATIC = CACHE_VERSION + "-static";
 
 // Asset statici da pre-cachare al momento dell'install

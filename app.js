@@ -3496,6 +3496,7 @@ function renderSuperadminPage() {
     if (!confirm("Eliminare TUTTE le leghe?")) return;
     if (!window._fbReady || !window._db) return;
     await window._set(window._ref(window._db, "leghe"), null);
+    await window._set(window._ref(window._db, "indice"), null);
     Object.keys(localStorage).filter(k => k.startsWith("ucl_lega_")).forEach(k => localStorage.removeItem(k));
     localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
     toast("Leghe eliminate."); renderSuperadminPage();
@@ -3503,7 +3504,9 @@ function renderSuperadminPage() {
   document.getElementById("btnDelAll")?.addEventListener("click", async () => {
     if (!confirm("RESET TOTALE?")) return;
     if (!confirm("Sicuro sicuro?")) return;
-    await window._set(window._ref(window._db, "/"), null);
+    await window._set(window._ref(window._db, "leghe"), null);
+    await window._set(window._ref(window._db, "indice"), null);
+    await window._set(window._ref(window._db, "global"), null);
     localStorage.clear(); location.reload();
   });
 
