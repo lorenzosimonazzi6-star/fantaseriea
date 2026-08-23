@@ -2261,7 +2261,7 @@ function _stopChatListener() {
 }
 
 // ── PUSH NOTIFICATIONS ───────────────────────────────────
-const VAPID_PUBLIC_KEY = "BJ1B-EW7e5SaoaynPQKWm6iSLHYFmxVboi7AtfFhJjCDC6fcAeFyWnUm27vPUT76QiSvjyjhthoHsqYGcFAfyFg";
+const VAPID_PUBLIC_KEY = "BAMW9MzIXvTQKFEDku4vae2VdvkSzCowiAFYba0XZtLMdukws9fxJVooyOmuJ7I3xkucpTvhVNxLoIFOtzGLr6A";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
