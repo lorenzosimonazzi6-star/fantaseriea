@@ -10,66 +10,66 @@
       ".write": "auth != null && auth.uid === 'hX8e2E722gTCpypcHthWdj4z4M23'"
     },
 
-    // ── Leghe ─────────────────────────────────────────────────────
-    "leghe": {
+    // ── Indice leghe (solo dati NON sensibili) ────────────────────
+    // Mirror di meta usato da lobby/elenco pubblico/ricerca codice, così il
+    // client non deve più leggere l'intero nodo `leghe` (che ora è protetto).
+    "indice": {
       ".read": true,
-
       "$legaId": {
-        // Scrittura al nodo radice della lega: permette creazione (prima volta)
-        // e cancellazione/modifica completa da parte dell'adminUid
-        ".write": "auth != null && (
-          !data.exists() ||
-          data.child('meta').child('adminUid').val() === auth.uid
-        )",
+        ".write": "auth != null && (!root.child('leghe').child($legaId).child('meta').exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)"
+      }
+    },
 
-        // Meta: leggibile da tutti, scrivibile solo dall'adminUid
+    // ── Leghe ─────────────────────────────────────────────────────
+    // NIENTE .read globale: le sotto-chiavi sensibili sono leggibili solo dai
+    // membri della lega (chi ha un nodo playerRose/$uid) o dall'admin.
+    "leghe": {
+      "$legaId": {
+        // Creazione (prima volta) o modifica completa da parte dell'adminUid
+        ".write": "auth != null && (!data.exists() || data.child('meta').child('adminUid').val() === auth.uid)",
+
+        // Meta: leggibile da tutti (nome/pubblica/codice/adminUid — non sensibili);
+        // serve a lobby, join, validazione codice.
         "meta": {
           ".read": true,
-          ".write": "auth != null && (
-            !data.exists() ||
-            data.child('adminUid').val() === auth.uid
-          )"
+          ".write": "auth != null && (!data.exists() || data.child('adminUid').val() === auth.uid)"
         },
 
-        // State: leggibile da tutti, scrivibile solo dall'adminUid
+        // State: solo membri/admin.
         "state": {
-          ".read": true,
-          ".write": "auth != null &&
-            root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
+          ".read": "auth != null && (root.child('leghe').child($legaId).child('playerRose').child(auth.uid).exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)",
+          ".write": "auth != null && root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
         },
 
-        // playerSostituzioni: ogni utente autenticato scrive SOLO il proprio nodo {uid}
-        // Lettura aperta a tutti i membri (serve al calcolo punteggi e alla vista admin)
+        // playerSostituzioni: lettura solo membri/admin; ogni utente scrive solo il proprio nodo.
         "playerSostituzioni": {
-          ".read": "auth != null",
+          ".read": "auth != null && (root.child('leghe').child($legaId).child('playerRose').child(auth.uid).exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)",
           "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
             ".write": "auth != null && auth.uid === $uid"
           }
         },
 
-        // playerRose: lettura aperta a tutti i membri autenticati (serve a classifica
-        // e calcolo punteggi). La privacy pre-deadline è gestita client-side con
-        // isDeadlinePassata(). Ogni utente può scrivere solo il proprio nodo.
+        // playerRose: lettura solo membri/admin; ogni utente scrive/legge SOLO il proprio nodo
+        // (il read del proprio nodo serve per iscriversi/entrare — vedi _ensureMyMembership).
         "playerRose": {
-          ".read": "auth != null",
+          ".read": "auth != null && (root.child('leghe').child($legaId).child('playerRose').child(auth.uid).exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)",
           "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
             ".write": "auth != null && auth.uid === $uid"
           }
         },
 
-        // pushSubscriptions: scritte solo via Admin SDK (push-subscribe.js).
-        // Lettura ristretta all'adminUid (contatore nel pannello admin); NON
-        // pubblica, per non esporre gli endpoint push degli utenti.
+        // pushSubscriptions: scritte via Admin SDK; lettura solo adminUid.
         "pushSubscriptions": {
           ".read": "auth != null && root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid",
           ".write": false
         },
 
-        // Eventuali altri path sotto una lega (chat, ecc.): solo adminUid
+        // Altri path (chat, ecc.): lettura membri/admin, scrittura solo adminUid.
         "$other": {
-          ".read": true,
-          ".write": "auth != null &&
-            root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
+          ".read": "auth != null && (root.child('leghe').child($legaId).child('playerRose').child(auth.uid).exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)",
+          ".write": "auth != null && root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid"
         }
       }
     },

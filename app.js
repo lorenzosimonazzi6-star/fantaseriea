@@ -1621,6 +1621,7 @@ async function eliminaLega() {
   if (!confirm(`Ultima conferma: eliminare definitivamente la lega "${nome}"?`)) return;
   try {
     // Elimina lega da Firebase
+    await window._set(window._ref(window._db, "indice/" + currentLegaId), null);
     await window._set(window._ref(window._db, "leghe/" + currentLegaId), null);
     // Rimuovi da users se loggato
     if (currentUser) {
@@ -3001,41 +3002,21 @@ function renderSidebar() {
 
     // Load user leghe
     if (window._fbReady && window._db) {
-      window._onVal(window._ref(window._db, "leghe"), snap => {
-        const all = snap.val() || {};
-        window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), uSnap => {
-          const userLegheIds = Object.keys(uSnap.val() || {});
-          const userLeghe = Object.entries(all).filter(([id]) => userLegheIds.includes(id));
-          const list = document.getElementById("sidebarLegheList");
-          if (!list) return;
-          if (!userLeghe.length) {
-            list.innerHTML = '<div class="sidebar-no-leghe">Nessuna lega ancora.<br>Creane una dalla home.</div>';
-            return;
-          }
-          list.innerHTML = userLeghe.map(([id, l]) => `
-            <div class="sidebar-lega-item${currentLegaId===id?" active":""}" data-id="${id}" data-state="${_escHtml(JSON.stringify(l.state||{}))}" data-meta="${_escHtml(JSON.stringify(l.meta||{}))}">
-              <span class="sidebar-lega-name">${l.meta?.nome||id}</span>
-              <span class="sidebar-lega-badge">${l.meta?.pubblica?"🌍":"🔒"}</span>
-              ${l.meta?.adminUid===currentUser.uid?'<span class="sidebar-lega-admin">👑</span>':""}
-            </div>`).join("");
-          list.querySelectorAll(".sidebar-lega-item").forEach(item => {
-            item.addEventListener("click", function() {
-              const id = this.dataset.id;
-              try {
-                const s = JSON.parse(this.dataset.state);
-                const m = JSON.parse(this.dataset.meta);
-                closeSidebar();
-                entraInLega(id, s, m);
-              } catch(e) {
-                // fallback: load from Firebase
-                window._onVal(window._ref(window._db,"leghe/"+id), snap2 => {
-                  const d=snap2.val();
-                  if(d?.state) { closeSidebar(); entraInLega(id,d.state,d.meta); }
-                }, {onlyOnce:true});
-              }
-            });
-          });
-        }, {onlyOnce:true});
+      window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), uSnap => {
+        const userLeghe = Object.entries(uSnap.val() || {});
+        const list = document.getElementById("sidebarLegheList");
+        if (!list) return;
+        if (!userLeghe.length) {
+          list.innerHTML = '<div class="sidebar-no-leghe">Nessuna lega ancora.<br>Creane una dalla home.</div>';
+          return;
+        }
+        list.innerHTML = userLeghe.map(([id, l]) => `
+          <div class="sidebar-lega-item${currentLegaId===id?" active":""}" data-id="${id}">
+            <span class="sidebar-lega-name">${_escHtml(l.nome||id)}</span>
+          </div>`).join("");
+        list.querySelectorAll(".sidebar-lega-item").forEach(item => {
+          item.addEventListener("click", function() { joinLegaById(this.dataset.id, closeSidebar); });
+        });
       }, {onlyOnce:true});
     }
   } else {
@@ -3188,32 +3169,23 @@ function renderHomeJoinForm() {
         <p class="pwd-error" id="joinEntraErr"></p>
       </div>`;
 
-    // Carica leghe pubbliche con _onVal (stesso pattern del codice funzionante)
-    window._onVal(window._ref(window._db, "leghe"), snap => {
-      const leghe = snap.val() || {};
+    // Carica leghe pubbliche dall'indice (dati non sensibili)
+    window._onVal(window._ref(window._db, "indice"), snap => {
+      const idx = snap.val() || {};
       const listEl = document.getElementById("joinLegheList");
       if (!listEl) return;
-      const pubbliche = Object.entries(leghe).filter(([,l]) => l.meta?.pubblica);
+      const pubbliche = Object.entries(idx).filter(([,l]) => l.pubblica);
       if (!pubbliche.length) {
         listEl.innerHTML = '<p style="color:var(--text2);font-size:13px;">Nessuna lega pubblica disponibile.</p>';
       } else {
         listEl.innerHTML = pubbliche.map(([id, l]) => {
-          const nPart = Array.isArray(l.state?.partecipanti) ? l.state.partecipanti.length : 0;
           return `<div class="lega-card" style="margin-bottom:8px">
-            <div class="lega-card-name">${l.meta?.nome || id}</div>
-            <div style="font-size:11px;color:var(--text2)">${nPart} partecipant${nPart===1?'e':'i'}</div>
+            <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
             <button class="btn-primary lega-join-btn" style="margin-top:6px;width:100%" data-id="${id}">Entra →</button>
           </div>`;
         }).join('');
         listEl.querySelectorAll('.lega-join-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const id = btn.dataset.id;
-            window._onVal(window._ref(window._db, "leghe/" + id), snap2 => {
-              const d = snap2.val();
-              if (d?.state) { closeSidebar(); entraInLega(id, d.state, d.meta); }
-              else toast("Errore nel caricamento della lega.", true);
-            }, {onlyOnce: true});
-          });
+          btn.addEventListener('click', () => joinLegaById(btn.dataset.id, closeSidebar));
         });
       }
     }, {onlyOnce: true});
@@ -3224,18 +3196,10 @@ function renderHomeJoinForm() {
       const errEl = document.getElementById("joinEntraErr");
       if (!codice) { errEl.textContent = "Inserisci un codice!"; return; }
       errEl.textContent = "⏳ Ricerca...";
-      // Prima prova come legaId diretto
-      window._onVal(window._ref(window._db, "leghe/" + codice), snap => {
-        const d = snap.val();
-        if (d?.state) { closeSidebar(); entraInLega(codice, d.state, d.meta); return; }
-        // Poi cerca tra i meta.codice (codice scelto dall'admin)
-        window._onVal(window._ref(window._db, "leghe"), allSnap => {
-          const all = allSnap.val() || {};
-          const found = Object.entries(all).find(([,l]) => l.meta?.codice?.toUpperCase() === codice);
-          if (found) { closeSidebar(); entraInLega(found[0], found[1].state, found[1].meta); }
-          else errEl.textContent = "❌ Codice non trovato.";
-        }, {onlyOnce: true});
-      }, {onlyOnce: true});
+      _resolveCodice(codice).then(id => {
+        if (id) joinLegaById(id, closeSidebar);
+        else errEl.textContent = "❌ Codice non trovato.";
+      });
     });
   }, 50);
 }
@@ -3299,7 +3263,7 @@ function renderHomeCreateForm() {
               WhatsApp
             </a>
           </div>`;
-        setTimeout(()=>{ closeSidebar(); entraInLega(legaId, defaultLegaState(), meta); }, 3000);
+        setTimeout(()=>{ closeSidebar(); entraInLega(legaId, meta); }, 3000);
       }
     });
 
@@ -3308,16 +3272,10 @@ function renderHomeCreateForm() {
       const err = document.getElementById("sbEntraErr");
       if (!codice) { err.textContent="Inserisci un codice!"; return; }
       err.textContent="⏳ Ricerca...";
-      window._onVal(window._ref(window._db,"leghe/"+codice), snap=>{
-        const d=snap.val();
-        if(d?.state){closeSidebar();entraInLega(codice,d.state,d.meta);return;}
-        window._onVal(window._ref(window._db,"leghe"),allSnap=>{
-          const all=allSnap.val()||{};
-          const found=Object.entries(all).find(([,l])=>l.meta?.codice?.toUpperCase()===codice);
-          if(found){closeSidebar();entraInLega(found[0],found[1].state,found[1].meta);}
-          else err.textContent="❌ Codice non trovato.";
-        },{onlyOnce:true});
-      },{onlyOnce:true});
+      _resolveCodice(codice).then(id=>{
+        if(id) joinLegaById(id, closeSidebar);
+        else err.textContent="❌ Codice non trovato.";
+      });
     });
   }, 60);
 }
@@ -4100,6 +4058,38 @@ function validaNomeLega(nome) {
   return null; // OK
 }
 // ──────────────────────────────────────────────────────────────────
+// ── Helper letture leghe (compatibili con le regole: meta pubblico, resto per-membro) ──
+function _fetchLegaMeta(id){
+  return new Promise(res=>{
+    if(!window._fbReady||!window._db||!window._onVal){ res(null); return; }
+    try{ window._onVal(window._ref(window._db, `leghe/${id}/meta`), s=>res(s.val()), {onlyOnce:true}); }
+    catch(e){ res(null); }
+  });
+}
+// Risolve un codice (legaId diretto oppure meta.codice via indice pubblico) -> legaId
+async function _resolveCodice(codice){
+  const cu = String(codice||"").toUpperCase();
+  if(!cu) return null;
+  if(await _fetchLegaMeta(cu)) return cu;
+  return new Promise(res=>{
+    try{ window._onVal(window._ref(window._db, "indice"), s=>{
+      const all=s.val()||{};
+      const found=Object.entries(all).find(([,l])=>String(l.codice||"").toUpperCase()===cu);
+      res(found?found[0]:null);
+    }, {onlyOnce:true}); }
+    catch(e){ res(null); }
+  });
+}
+// Entra in una lega dato l'id: valida via meta (pubblico), poi entraInLega (che crea la membership).
+async function joinLegaById(id, closeFn){
+  if(!id) return;
+  if(!currentUser){ toast("Accedi per entrare in una lega.", true); return; }
+  const meta = await _fetchLegaMeta(id);
+  if(!meta){ toast("Lega non trovata!", true); return; }
+  if(typeof closeFn==="function") closeFn();
+  await entraInLega(id, meta);
+}
+
 async function creaLega(nome, pubblica, codice) {
   const erroreNome = validaNomeLega(nome);
   if (erroreNome) { toast(erroreNome, true); return null; }
@@ -4112,6 +4102,10 @@ async function creaLega(nome, pubblica, codice) {
   try {
     await window._set(window._ref(window._db, "leghe/" + legaId + "/meta"), meta);
     await window._set(window._ref(window._db, "leghe/" + legaId + "/state"), ls);
+    // Indice pubblico (dati non sensibili) per lobby/ricerca codice
+    await window._set(window._ref(window._db, "indice/" + legaId), {
+      nome, pubblica, codice: meta.codice, adminUid: uid, createdAt: meta.createdAt
+    });
     if (uid) await addLegaToUser(uid, legaId, nome);
     return { legaId, meta };
   } catch(e) { toast("Errore: " + e.message, true); return null; }
@@ -4127,10 +4121,9 @@ function aggiornaTabAdmin() {
   adminBtn.style.display = isCreatoreCorrente() ? "" : "none";
 }
 
-function entraInLega(legaId, legaState, legaMeta) {
+async function entraInLega(legaId, legaMeta) {
   currentLegaId = legaId; currentLegaMeta = legaMeta || null;
-  state = sanitizeLegaState(legaState);
-  localStorage.setItem("ucl_lega_" + legaId, JSON.stringify(state));
+  state = sanitizeLegaState(null);
   localStorage.setItem("ucl_lastLega", legaId);
   if (legaMeta) localStorage.setItem("ucl_lastLegaMeta", JSON.stringify(legaMeta));
   // Update URL
@@ -4148,12 +4141,13 @@ function entraInLega(legaId, legaState, legaMeta) {
     ["adminLockIcon","adminLockIconMobile"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="🔒";});
   }
   aggiornaTabAdmin();
-  // Add to user leghe if logged in
-  if (currentUser) addLegaToUser(currentUser.uid, legaId, legaMeta?.nome || legaId);
+  // Membership PRIMA di leggere state/rose/chat: le regole RTDB le consentono
+  // solo ai membri (playerRose/uid) o all'admin. _ensureMyMembership scrive il
+  // proprio nodo playerRose, sbloccando le letture successive.
+  if (currentUser) { await _ensureMyMembership(); addLegaToUser(currentUser.uid, legaId, legaMeta?.nome || legaId); }
   listenGlobal(); listenLega(legaId);
   subscribePlayerSostituzioni(legaId);
   subscribePlayerRose(legaId);
-  if (currentUser) _ensureMyMembership();
   const savedTab = localStorage.getItem("ucl_tab");
   navigate(savedTab && savedTab !== "home" ? savedTab : "home");
   initPushBtn();
@@ -4196,7 +4190,7 @@ function renderLobby() {
 
   function buildLobby(leghe) {
     const user = currentUser;
-    const pubbliche = Object.entries(leghe).filter(([,l]) => l.meta?.pubblica);
+    const pubbliche = Object.entries(leghe).filter(([,l]) => l.pubblica);
 
     let html = '';
 
@@ -4216,9 +4210,9 @@ function renderLobby() {
         html += `<div class="lobby-section"><h3>🏆 Le tue Leghe</h3><div class="leghe-grid">`;
         html += userLeghe.map(([id, l]) => `
           <div class="lega-card">
-            <div class="lega-card-name">${l.meta?.nome || id}</div>
-            <div class="lega-card-badge">${l.meta?.pubblica ? "🌍 Pubblica" : "🔒 Privata"}</div>
-            ${l.meta?.adminUid === user.uid ? '<div style="font-size:10px;color:var(--accent);font-weight:700">👑 Admin</div>' : ''}
+            <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
+            <div class="lega-card-badge">${l.pubblica ? "🌍 Pubblica" : "🔒 Privata"}</div>
+            ${l.adminUid === user.uid ? '<div style="font-size:10px;color:var(--accent);font-weight:700">👑 Admin</div>' : ''}
             <button class="btn-primary lega-join-btn" data-id="${id}">Entra →</button>
           </div>`).join('');
         html += '</div></div>';
@@ -4264,7 +4258,7 @@ function renderLobby() {
         html += `<div class="lobby-section"><h3>🌍 Leghe Pubbliche</h3><div class="leghe-grid">`;
         html += pubbliche.map(([id, l]) => `
           <div class="lega-card">
-            <div class="lega-card-name">${l.meta?.nome || id}</div>
+            <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
             <div class="lega-card-badge">🌍 Pubblica</div>
             <button class="btn-primary lega-join-btn" data-id="${id}">Entra →</button>
           </div>`).join('');
@@ -4319,15 +4313,7 @@ function renderLobby() {
       const res = await signIn(email, pwd);
       document.getElementById("btnLogin").textContent = "Accedi";
       if (res.error) { err.textContent = res.error; return; }
-      // onAuthStateChanged will re-render lobby with user's leghe
-      // If user has a last lega, auto-enter it
-      const lastLega = localStorage.getItem("ucl_lastLega");
-      if (lastLega && window._fbReady && window._db) {
-        window._onVal(window._ref(window._db,"leghe/"+lastLega), snap=>{
-          const d=snap.val();
-          if(d?.state) entraInLega(lastLega,d.state,d.meta);
-        },{onlyOnce:true});
-      }
+      // onAuthStateChanged gestisce render lobby ed eventuale ingresso ultima lega
     });
     document.getElementById("loginPwd")?.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("btnLogin")?.click(); });
 
@@ -4374,12 +4360,8 @@ function renderLobby() {
     // ── Join buttons ──
     wrap.querySelectorAll(".lega-join-btn").forEach(btn => {
       btn.addEventListener("click", function() {
-        const id = this.dataset.id; this.textContent = "⏳..."; this.disabled = true;
-        window._onVal(window._ref(window._db, "leghe/" + id), snap => {
-          const d = snap.val();
-          if (d?.state) entraInLega(id, d.state, d.meta);
-          else toast("Lega non trovata!", true);
-        }, { onlyOnce: true });
+        this.textContent = "⏳..."; this.disabled = true;
+        joinLegaById(this.dataset.id);
       });
     });
 
@@ -4389,16 +4371,10 @@ function renderLobby() {
       const errEl = document.getElementById("legaCodiceError");
       if (!codice) { errEl.textContent = "Inserisci un codice!"; return; }
       errEl.textContent = "⏳ Ricerca...";
-      window._onVal(window._ref(window._db, "leghe/" + codice), snap => {
-        const d = snap.val();
-        if (d?.state) { entraInLega(codice, d.state, d.meta); return; }
-        window._onVal(window._ref(window._db, "leghe"), allSnap => {
-          const all = allSnap.val() || {};
-          const found = Object.entries(all).find(([,l]) => l.meta?.codice?.toUpperCase() === codice);
-          if (found) entraInLega(found[0], found[1].state, found[1].meta);
-          else errEl.textContent = "❌ Codice non trovato.";
-        }, { onlyOnce: true });
-      }, { onlyOnce: true });
+      _resolveCodice(codice).then(id => {
+        if (id) joinLegaById(id);
+        else errEl.textContent = "❌ Codice non trovato.";
+      });
     });
     document.getElementById("legaCodiceInput")?.addEventListener("keydown", e => {
       if (e.key === "Enter") document.getElementById("btnEntraPrivata")?.click();
@@ -4427,7 +4403,7 @@ function renderLobby() {
           <small><a href="${link}" style="color:var(--accent)">${link}</a>
           <button class="btn-sec" style="font-size:10px;padding:2px 7px;margin-left:6px"
             onclick="navigator.clipboard.writeText('${link}').then(()=>toast('Copiato!'))">📋</button></small>`;
-        setTimeout(() => entraInLega(legaId, defaultLegaState(), meta), 1500);
+        setTimeout(() => entraInLega(legaId, meta), 1500);
       }
     });
   }
@@ -4437,12 +4413,12 @@ function renderLobby() {
     if (currentUser) {
       window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), snap => {
         currentUser._leghe = snap.val() || {};
-        window._onVal(window._ref(window._db, "leghe"), allSnap => {
+        window._onVal(window._ref(window._db, "indice"), allSnap => {
           buildLobby(allSnap.val() || {});
         }, { onlyOnce: true });
       }, { onlyOnce: true });
     } else {
-      window._onVal(window._ref(window._db, "leghe"), snap => buildLobby(snap.val() || {}), { onlyOnce: true });
+      buildLobby({});
     }
   } else {
     buildLobby({});
@@ -4452,33 +4428,10 @@ function renderLobby() {
 function checkUrlLega() {
   const params = new URLSearchParams(location.search);
   const legaId = params.get("lega")?.toUpperCase();
-  if (legaId && window._fbReady && window._db) {
-    window._onVal(window._ref(window._db, "leghe/" + legaId), snap => {
-      const d = snap.val();
-      if (d?.state) entraInLega(legaId, d.state, d.meta);
-      else showLobby();
-    }, { onlyOnce: true });
-    return true;
-  }
-  const lastLega = localStorage.getItem("ucl_lastLega");
-  if (lastLega) {
-    const cached = localStorage.getItem("ucl_lega_" + lastLega);
-    const cachedMeta = localStorage.getItem("ucl_lastLegaMeta");
-    if (cached) {
-      try {
-        entraInLega(lastLega, JSON.parse(cached), cachedMeta ? JSON.parse(cachedMeta) : null);
-        if (window._fbReady && window._db) {
-          window._onVal(window._ref(window._db, "leghe/" + lastLega + "/state"), snap => {
-            const s = snap.val();
-            if (s && (s._updatedAt || 0) > (state._updatedAt || 0)) {
-              state = sanitizeLegaState(s); saveLocalOnly(); renderPage(currentPage());
-            }
-          }, { onlyOnce: true });
-        }
-        return true;
-      } catch(e) {}
-    }
-  }
+  if (legaId) localStorage.setItem("ucl_lastLega", legaId);
+  // L'ingresso effettivo richiede auth + membership: lo esegue onAuthStateChanged
+  // appena l'utente è noto. Qui mostriamo la lobby se c'è un target da aprire.
+  if (legaId || localStorage.getItem("ucl_lastLega")) { showLobby(); return true; }
   return false;
 }
 
@@ -4565,6 +4518,9 @@ function initAuth() {
     onAuthStateChanged(window._fbAuth, user=>{
       currentUser=user;
       if(!currentLegaId){
+        const params = new URLSearchParams(location.search);
+        const target = (params.get("lega")?.toUpperCase()) || localStorage.getItem("ucl_lastLega");
+        if(user && target){ joinLegaById(target); return; }
         renderHomeButtons();
         renderSidebar();
       }
