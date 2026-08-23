@@ -7,7 +7,7 @@
     // scrive via Admin SDK e bypassa comunque queste regole.
     "global": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'hX8e2E722gTCpypcHthWdj4z4M23'"
+      ".write": "auth != null && auth.uid === 'MUzTsgbmvHOuOc3wEAfNnAeIv4M2'"
     },
 
     // ── Indice leghe (solo dati NON sensibili) ────────────────────
@@ -15,7 +15,7 @@
     // client non deve più leggere l'intero nodo `leghe` (che ora è protetto).
     "indice": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'hX8e2E722gTCpypcHthWdj4z4M23'",
+      ".write": "auth != null && auth.uid === 'MUzTsgbmvHOuOc3wEAfNnAeIv4M2'",
       "$legaId": {
         ".write": "auth != null && (!root.child('leghe').child($legaId).child('meta').exists() || root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid)"
       }
@@ -25,7 +25,7 @@
     // NIENTE .read globale: le sotto-chiavi sensibili sono leggibili solo dai
     // membri della lega (chi ha un nodo playerRose/$uid) o dall'admin.
     "leghe": {
-      ".write": "auth != null && auth.uid === 'hX8e2E722gTCpypcHthWdj4z4M23'",
+      ".write": "auth != null && auth.uid === 'MUzTsgbmvHOuOc3wEAfNnAeIv4M2'",
       "$legaId": {
         // Creazione (prima volta) o modifica completa da parte dell'adminUid
         ".write": "auth != null && (!data.exists() || data.child('meta').child('adminUid').val() === auth.uid)",
