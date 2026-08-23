@@ -1961,19 +1961,21 @@ function renderGrafico() {
     return;
   }
 
-  const GIORNATE_KICKOFF = {
-    1: Date.parse("2026-06-11T19:00:00Z"),
-    2: Date.parse("2026-06-18T16:00:00Z"),
-    3: Date.parse("2026-06-24T19:00:00Z"),
-    4: Date.parse("2026-07-01T00:00:00Z"),
-    5: Date.parse("2026-07-04T00:00:00Z"),
-    6: Date.parse("2026-07-07T00:00:00Z"),
-    7: Date.parse("2026-07-11T00:00:00Z"),
-    8: Date.parse("2026-07-14T00:00:00Z"),
-  };
+  // Kickoff per giornata derivati dal calendario reale (matches.js):
+  // una giornata entra nel grafico solo dopo il suo primo calcio d'inizio.
+  // Le giornate senza kickoff noto (calendario non ancora pubblicato) sono
+  // trattate come future e non compaiono.
+  const GIORNATE_KICKOFF = {};
+  {
+    const _cal = (typeof MATCHES !== "undefined" ? MATCHES : {});
+    for (const [gId, partite] of Object.entries(_cal)) {
+      const ts = (partite || []).map(m => Date.parse(m.kickoff)).filter(n => !isNaN(n));
+      if (ts.length) GIORNATE_KICKOFF[Number(gId)] = Math.min(...ts);
+    }
+  }
   const now       = Date.now();
   const giornateIds = Object.keys(GIORNATE_FALLBACK).map(Number).sort((a, b) => a - b);
-  const playedIds   = giornateIds.filter(id => now >= (GIORNATE_KICKOFF[id] || 0));
+  const playedIds   = giornateIds.filter(id => now >= (GIORNATE_KICKOFF[id] ?? Infinity));
 
   if (!playedIds.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>Il torneo non è ancora iniziato.</p></div>`;
@@ -2027,7 +2029,7 @@ function renderGrafico() {
   const datasets = shown.map((p, ci) => {
     const isMe = p.id === myPartId;
     const data = giornateIds.map(gId =>
-      now < (GIORNATE_KICKOFF[gId] || 0) ? null : (rankAt[p.id]?.[gId] ?? null)
+      now < (GIORNATE_KICKOFF[gId] ?? Infinity) ? null : (rankAt[p.id]?.[gId] ?? null)
     );
     const color = isMe ? "#e8ff3a" : palette[ci % palette.length];
     return {
