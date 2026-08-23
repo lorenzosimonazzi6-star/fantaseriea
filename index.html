@@ -719,6 +719,20 @@
             
 
             <div class="admin-card">
+              <h3><span class="material-symbols-outlined">schedule</span> Deadline creazione rose</h3>
+              <p class="hint">Fino a questa data/ora i partecipanti possono creare e modificare liberamente la rosa. Dopo, la rosa si blocca e si cambia solo tramite le finestre di sostituzione. Lascia vuoto = nessuna scadenza (rosa sempre modificabile).</p>
+              <div class="field-group">
+                <label>Data e ora (fuso locale)</label>
+                <input type="datetime-local" id="adminDeadlineInput">
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                <button class="btn-primary" id="btnSalvaDeadline">💾 Salva deadline</button>
+                <button class="btn-sec" id="btnRimuoviDeadline">✕ Nessuna scadenza</button>
+              </div>
+              <div id="adminDeadlineStatus" class="hint" style="margin-top:8px"></div>
+            </div>
+
+            <div class="admin-card">
               <h3><span class="material-symbols-outlined">star</span> <span data-i18n="admin.captains">Capitani</span></h3>
               <p class="hint">Imposta il capitano (+2 pt se voto ≥ 7, non attaccanti).</p>
               <div id="capitanoForm"></div>
