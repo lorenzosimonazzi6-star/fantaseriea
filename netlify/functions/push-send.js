@@ -9,14 +9,21 @@ if (!admin.apps.length) {
   });
 }
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:admin@fantaarena.it",
-  process.env.VAPID_PUBLIC_KEY  || "BJ1B-EW7e5SaoaynPQKWm6iSLHYFmxVboi7AtfFhJjCDC6fcAeFyWnUm27vPUT76QiSvjyjhthoHsqYGcFAfyFg",
-  process.env.VAPID_PRIVATE_KEY || "baaX5bIAQ_2IENU4L78Doe4iF5InbIokbuapcGfADhA"
-);
+// Chiavi VAPID SOLO da env: la privata è un segreto, mai hardcoded.
+// Rigenerare con `npx web-push generate-vapid-keys`, impostare le env su
+// Netlify e tenere VAPID_PUBLIC_KEY in sync col client (app.js).
+const VAPID_CONFIGURED = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+if (VAPID_CONFIGURED) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:admin@fantaarena.it",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
+  if (!VAPID_CONFIGURED) return { statusCode: 503, body: "Push non configurato (VAPID env mancanti)" };
   // Verify admin secret
   const { legaId, title, body, url, secret } = JSON.parse(event.body || "{}");
   if (secret !== process.env.ADMIN_PUSH_SECRET) return { statusCode: 401, body: "Unauthorized" };

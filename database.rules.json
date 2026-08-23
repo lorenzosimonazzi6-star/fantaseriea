@@ -3,10 +3,11 @@
 
     // ── Stato globale (voti, giornataCorrente, giocatoriSquadra) ──
     // Lettura: tutti (serve anche senza login per la home pubblica)
-    // Scrittura: solo utenti autenticati (la verifica admin è lato client)
+    // Scrittura: SOLO l'account superadmin (uid hardcoded qui sotto). Il poller
+    // scrive via Admin SDK e bypassa comunque queste regole.
     "global": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && auth.uid === 'hX8e2E722gTCpypcHthWdj4z4M23'"
     },
 
     // ── Leghe ─────────────────────────────────────────────────────
@@ -56,7 +57,15 @@
           }
         },
 
-        // Eventuali altri path sotto una lega (chat, pushSubscriptions, ecc.): solo adminUid
+        // pushSubscriptions: scritte solo via Admin SDK (push-subscribe.js).
+        // Lettura ristretta all'adminUid (contatore nel pannello admin); NON
+        // pubblica, per non esporre gli endpoint push degli utenti.
+        "pushSubscriptions": {
+          ".read": "auth != null && root.child('leghe').child($legaId).child('meta').child('adminUid').val() === auth.uid",
+          ".write": false
+        },
+
+        // Eventuali altri path sotto una lega (chat, ecc.): solo adminUid
         "$other": {
           ".read": true,
           ".write": "auth != null &&
