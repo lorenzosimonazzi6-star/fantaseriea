@@ -3031,8 +3031,8 @@ function renderSidebar() {
 
     // Load user leghe
     if (window._fbReady && window._db) {
-      window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), uSnap => {
-        const userLeghe = Object.entries(uSnap.val() || {});
+      window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), async uSnap => {
+        const userLeghe = Object.entries(await _aliveUserLeghe(uSnap.val()));
         const list = document.getElementById("sidebarLegheList");
         if (!list) return;
         if (!userLeghe.length) {
@@ -4121,6 +4121,19 @@ async function joinLegaById(id, closeFn){
   if(typeof closeFn==="function") closeFn();
   await entraInLega(id, meta);
 }
+// Ritorna solo le leghe dell'utente ancora esistenti (meta presente) e rimuove
+// dall'indice utente quelle eliminate (es. dal superadmin), che il proprietario
+// dell'account può ripulire da sé (le regole vietano di toccare users altrui).
+async function _aliveUserLeghe(obj){
+  const entries = Object.entries(obj || {});
+  const checked = await Promise.all(entries.map(async ([id, v]) => [id, v, await _fetchLegaMeta(id)]));
+  const alive = {};
+  for (const [id, v, meta] of checked){
+    if (meta) alive[id] = v;
+    else if (currentUser) { try { await window._set(window._ref(window._db, `users/${currentUser.uid}/leghe/${id}`), null); } catch(e){} }
+  }
+  return alive;
+}
 
 async function creaLega(nome, pubblica, codice) {
   const erroreNome = validaNomeLega(nome);
@@ -4443,8 +4456,8 @@ function renderLobby() {
   if (window._fbReady && window._db) {
     // Load user leghe if logged in
     if (currentUser) {
-      window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), snap => {
-        currentUser._leghe = snap.val() || {};
+      window._onVal(window._ref(window._db, "users/" + currentUser.uid + "/leghe"), async snap => {
+        currentUser._leghe = await _aliveUserLeghe(snap.val());
         window._onVal(window._ref(window._db, "indice"), allSnap => {
           buildLobby(allSnap.val() || {});
         }, { onlyOnce: true });
