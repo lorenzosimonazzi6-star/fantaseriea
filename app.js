@@ -3470,41 +3470,6 @@ function renderSuperadminPage() {
         </div>
         <div id="superVotiTable" class="voti-table-wrap"></div>
       </div>
-      <div class="admin-card" style="grid-column:1/-1">
-        <h3>🔄 Migrazione Nomi Rose</h3>
-        <p class="hint">Allinea i nomi dei giocatori in tutte le rose al database giocatori aggiornato. Usa questa funzione dopo aver ricaricato il CSV con i nomi corretti.</p>
-        <button class="btn-primary" id="btnMigraNomiRose">🔄 Migra nomi rose</button>
-        <p id="migraNomiRoseResult" style="margin-top:10px;font-size:13px"></p>
-      </div>
-
-      <div class="admin-card" style="grid-column:1/-1">
-        <h3>🔤 Alias Nomi Sofascore</h3>
-        <p class="hint">Mappa nomi Sofascore non riconosciuti al giocatore corretto nel database. Il poller li usa in automatico.</p>
-
-        <button class="btn-sec" id="btnRilevaOrfani">🔍 Rileva nomi non risolti</button>
-        <div id="aliasOrfaniList" style="margin-top:12px"></div>
-
-        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
-          <h4 style="margin:0 0 10px;font-size:14px;font-weight:700">Aggiungi alias manuale</h4>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div class="field-group" style="flex:0 0 auto">
-              <label>Club</label>
-              <select id="aliasNazione"><option value="">– Club –</option>${(typeof SQUADRE !== "undefined" ? SQUADRE : []).map(n=>`<option value="${n}">${n}</option>`).join("")}</select>
-            </div>
-            <div class="field-group" style="flex:1;min-width:140px">
-              <label>Nome Sofascore</label>
-              <input type="text" id="aliasSofaName" placeholder="es. Y. Bounou" style="width:100%;box-sizing:border-box">
-            </div>
-            <div class="field-group" style="flex:1;min-width:140px">
-              <label>Giocatore nel DB</label>
-              <select id="aliasDbName" disabled><option value="">– prima seleziona nazione –</option></select>
-            </div>
-            <button class="btn-primary" id="btnSalvaAlias">💾 Salva</button>
-          </div>
-        </div>
-
-        <div id="aliasEsistenti" style="margin-top:16px"></div>
-      </div>
     </div>`;
 
   document.getElementById("superGiornata").value = globalState.giornataCorrente || "1";
@@ -3548,120 +3513,7 @@ function renderSuperadminPage() {
   document.getElementById("superSelectGiornata")?.addEventListener("change", renderSuperVotiTable);
   document.getElementById("superBtnSalvaVoti")?.addEventListener("click", saveSuperVoti);
 
-  document.getElementById("btnMigraNomiRose")?.addEventListener("click", migraNomiRose);
-
-  // ── ALIAS NOMI SOFASCORE ─────────────────────────────────────
-  {
-    const aliasNazioneEl  = document.getElementById("aliasNazione");
-    const aliasSofaNameEl = document.getElementById("aliasSofaName");
-    const aliasDbNameEl   = document.getElementById("aliasDbName");
-    const aliasOrfaniList = document.getElementById("aliasOrfaniList");
-    const aliasEsistentiEl = document.getElementById("aliasEsistenti");
-
-    function fbOnceAlias(path) {
-      return new Promise(res => window._onVal(window._ref(window._db, path), snap => res(snap), { onlyOnce: true }));
-    }
-
-    async function renderAliasEsistenti() {
-      const snap = await fbOnceAlias("global/playerAliases");
-      const aliases = snap.val() || {};
-      const rows = Object.entries(aliases).flatMap(([naz, entries]) =>
-        Object.entries(entries).map(([key, dbName]) => ({ naz, key, dbName }))
-      );
-      if (!rows.length) {
-        aliasEsistentiEl.innerHTML = `<p class="hint" style="margin:0">Nessun alias presente.</p>`;
-        return;
-      }
-      aliasEsistentiEl.innerHTML = `
-        <h4 style="margin:0 0 8px;font-size:14px;font-weight:700">Alias esistenti (${rows.length})</h4>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          ${rows.map(r => `
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:13px;flex-wrap:wrap">
-              <span style="color:var(--text2);min-width:80px">${r.naz}</span>
-              <span style="color:var(--accent2);font-weight:600">${r.key}</span>
-              <span style="color:var(--text2)">→</span>
-              <span style="color:var(--accent);font-weight:600;flex:1">${r.dbName}</span>
-              <button class="btn-sec alias-del" data-naz="${r.naz}" data-key="${r.key}" style="padding:2px 8px;font-size:11px;color:var(--accent2);border-color:var(--accent2)">✕</button>
-            </div>`
-          ).join("")}
-        </div>`;
-      aliasEsistentiEl.querySelectorAll(".alias-del").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          if (!confirm(`Eliminare alias "${btn.dataset.key}"?`)) return;
-          await window._set(window._ref(window._db, `global/playerAliases/${btn.dataset.naz}/${btn.dataset.key}`), null);
-          toast("Alias eliminato.");
-          renderAliasEsistenti();
-        });
-      });
-    }
-    renderAliasEsistenti();
-
-    aliasNazioneEl?.addEventListener("change", () => {
-      const naz = aliasNazioneEl.value;
-      if (!naz) { aliasDbNameEl.innerHTML = `<option value="">– prima seleziona nazione –</option>`; aliasDbNameEl.disabled = true; return; }
-      const players = (globalState.giocatoriSquadra?.[naz] || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
-      aliasDbNameEl.innerHTML = `<option value="">– Giocatore –</option>` + players.map(p => `<option value="${_escHtml(p.nome)}">${_escHtml(p.nome)}</option>`).join("");
-      aliasDbNameEl.disabled = false;
-    });
-
-    document.getElementById("btnSalvaAlias")?.addEventListener("click", async () => {
-      const naz     = aliasNazioneEl?.value;
-      const sofaN   = aliasSofaNameEl?.value.trim();
-      const dbName  = aliasDbNameEl?.value;
-      if (!naz || !sofaN || !dbName) { toast("Compila tutti i campi.", true); return; }
-      await window._set(window._ref(window._db, `global/playerAliases/${naz}/${safeKey(sofaN)}`), dbName);
-      toast(`✅ "${sofaN}" → "${dbName}" (${naz})`);
-      aliasSofaNameEl.value = "";
-      aliasDbNameEl.value = "";
-      renderAliasEsistenti();
-    });
-
-    document.getElementById("btnRilevaOrfani")?.addEventListener("click", () => {
-      const seen = new Map();
-      for (const [naz, giornate] of Object.entries(globalState.voti || {})) {
-        const knownKeys = new Set((globalState.giocatoriSquadra?.[naz] || []).map(g => safeKey(g.nome)));
-        for (const [gId, giocatori] of Object.entries(giornate || {})) {
-          for (const [key, entry] of Object.entries(giocatori || {})) {
-            if (!knownKeys.has(key) && entry?.v !== undefined) {
-              const mk = `${naz}||${key}`;
-              if (!seen.has(mk)) seen.set(mk, { naz, key, v: entry.v, giornate: [] });
-              seen.get(mk).giornate.push(`G${gId}`);
-            }
-          }
-        }
-      }
-      if (!seen.size) {
-        aliasOrfaniList.innerHTML = `<p class="hint" style="margin:0">✅ Nessun nome non risolto trovato.</p>`;
-        return;
-      }
-      aliasOrfaniList.innerHTML = [...seen.values()].map(o => {
-        const playerOpts = (globalState.giocatoriSquadra?.[o.naz] || [])
-          .slice().sort((a, b) => a.nome.localeCompare(b.nome))
-          .map(p => `<option value="${_escHtml(p.nome)}">${_escHtml(p.nome)}</option>`).join("");
-        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px;background:rgba(255,100,0,.08);border:1px solid rgba(255,100,0,.2);border-radius:8px;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2)">${o.naz} ${o.giornate.join(" ")}</span>
-          <span style="font-weight:700;color:var(--accent2)">${o.key}</span>
-          <span style="font-size:12px;color:var(--text2)">voto: ${o.v}</span>
-          <select class="orfano-sel" data-naz="${o.naz}" data-key="${o.key}" style="flex:1;min-width:140px">
-            <option value="">– mappa a –</option>${playerOpts}
-          </select>
-          <button class="btn-primary orfano-save" data-naz="${o.naz}" data-key="${o.key}" style="font-size:12px;padding:5px 10px">💾 Salva</button>
-        </div>`;
-      }).join("");
-
-      aliasOrfaniList.querySelectorAll(".orfano-save").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const sel = aliasOrfaniList.querySelector(`.orfano-sel[data-naz="${btn.dataset.naz}"][data-key="${btn.dataset.key}"]`);
-          if (!sel?.value) { toast("Seleziona un giocatore.", true); return; }
-          await window._set(window._ref(window._db, `global/playerAliases/${btn.dataset.naz}/${btn.dataset.key}`), sel.value);
-          toast(`✅ "${btn.dataset.key}" → "${sel.value}"`);
-          btn.closest("div").style.opacity = "0.35";
-          btn.disabled = true;
-          renderAliasEsistenti();
-        });
-      });
-    });
-  }
+  // (sezione Migrazione Nomi Rose + Alias Sofascore rimossa dal pannello superadmin)
 
   // ── LIVE PARTITE ─────────────────────────────────────────────
   renderSuperMatchList(globalState.giornataCorrente || "1");
@@ -3917,32 +3769,6 @@ async function importFromSofascore(eventId, home, away, gId, btnEl) {
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = origText;
-  }
-}
-
-async function migraNomiRose() {
-  const btn = document.getElementById("btnMigraNomiRose");
-  const resultEl = document.getElementById("migraNomiRoseResult");
-  if (!confirm("Migrare i nomi nelle rose di tutte le leghe?\nL'operazione è reversibile solo manualmente.")) return;
-
-  btn.disabled = true;
-  btn.textContent = "⏳ Migrazione in corso...";
-  if (resultEl) resultEl.textContent = "";
-
-  try {
-    const res = await fetch(".netlify/functions/migrate-rose", { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    const msg = `✅ ${data.totalUpdated} nomi aggiornati su ${data.totalChecked} giocatori controllati.`;
-    toast(msg);
-    if (resultEl) resultEl.textContent = msg;
-  } catch (err) {
-    console.error("migraNomiRose:", err);
-    toast("Errore migrazione: " + err.message, true);
-    if (resultEl) resultEl.textContent = "❌ Errore: " + err.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "🔄 Migra nomi rose";
   }
 }
 
