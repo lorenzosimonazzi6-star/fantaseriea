@@ -4297,6 +4297,7 @@ function renderLobby() {
 }
 
 function checkUrlLega() {
+  if (currentLegaId) return true; // già in una lega (es. entrati via onAuthStateChanged): non riaprire la lobby
   const params = new URLSearchParams(location.search);
   const legaId = params.get("lega")?.toUpperCase();
   if (legaId) localStorage.setItem("ucl_lastLega", legaId);
