@@ -286,6 +286,8 @@ function navigate(page){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
   const el=document.getElementById("page-"+page);
   if(el)el.classList.add("active");
+  // showLobby() imposta display:block inline sulla lobby: azzeralo entrando in una pagina reale
+  const _lb=document.getElementById("page-lobby"); if(_lb && page!=="lobby") _lb.style.display="none";
   document.querySelectorAll('[data-page="'+page+'"]').forEach(b=>b.classList.add("active"));
   const gC=globalState.giornataCorrente||"1";
   ["giornataSelectGiornata","selectGiornata"].forEach(id=>{const e=document.getElementById(id);if(e&&e.value!==gC)e.value=gC;});
