@@ -192,12 +192,13 @@ function listenLega(legaId){
   if(_fbUnsubLega){ _fbUnsubLega(); _fbUnsubLega=null; }
   _fbUnsubLega = window._onVal(window._ref(window._db,"leghe/"+legaId+"/state"),(snap)=>{
     const d=snap.val();if(!d)return;
+    const isNewer = (d._updatedAt||0) > (state._updatedAt||0);
     const roseVuote = !state.rose || Object.keys(state.rose).length === 0;
-    if((d._updatedAt||0)<=(state._updatedAt||0) && !roseVuote)return;
+    if(!isNewer && !roseVuote)return;
     state=sanitizeLegaState(d);
     mergePlayerRoseIntoState(); // riapplica iscrizioni/rose self-service
     saveLocalOnly();renderPage(currentPage());
-    showSyncBar("🔄 Lega aggiornata",2000);
+    if(isNewer) showSyncBar("🔄 Lega aggiornata",2000); // banner SOLO su cambiamento reale
   });
 }
 function listenGlobal(){
