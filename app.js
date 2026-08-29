@@ -48,7 +48,18 @@ let currentUser=null; // Firebase Auth user
 const GIORNATE_FALLBACK = Object.fromEntries(Array.from({ length: 38 }, (_, i) => [i + 1, "G" + (i + 1)]));
 const GIORNATE = new Proxy({}, { get: (_,id) => { const k="giornate."+id, tv=(typeof t==="function")?t(k):null; return (tv && tv!==k) ? tv : (GIORNATE_FALLBACK[id] || "G"+id); } });
 // Opzioni <option> per i menu giornata (38 giornate Serie A)
-function giornateOptions(){ return Array.from({length:38},(_,i)=>`<option value="${i+1}">Giornata ${i+1}</option>`).join(""); }
+function giornateOptions(){ const lbl=(typeof t==="function")?t("ui.matchday"):"Giornata"; return Array.from({length:38},(_,i)=>`<option value="${i+1}">${lbl} ${i+1}</option>`).join(""); }
+// Ripopola i due select giornata costruiti via JS (mantiene il valore selezionato)
+function populateGiornataSelects(){
+  const opts = giornateOptions();
+  ["giornataSelectGiornata","selectGiornata"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    const prev=el.value;
+    el.innerHTML=opts;
+    if(prev) el.value=prev;
+  });
+}
 
 // ── REGOLAMENTO BONUS/MALUS ──────────────────────────────────
 // votoBase + bonus_calcolati - malus_calcolati = totale
@@ -65,17 +76,17 @@ const MALUS_GS     = 1;   // gol subito (portiere)
 // Flags disponibili per ruolo: { key, label, cssClass, isBonus, perRole }
 function getFlagsForRuolo(ruolo) {
   const flags = [];
-  if (BONUS_GOL[ruolo] > 0)    flags.push({ key:"gol",    label:`⚽ Gol (+${BONUS_GOL[ruolo]})`,       cls:"gol",    bonus: BONUS_GOL[ruolo],    multi:true });
-  if (BONUS_ASSIST[ruolo] > 0) flags.push({ key:"assist",  label:`🎯 Assist (+${BONUS_ASSIST[ruolo]})`, cls:"assist",  bonus: BONUS_ASSIST[ruolo],  multi:true });
-  if (BONUS_PI[ruolo] > 0)     flags.push({ key:"pi",      label:`🧤 P.Inv (+${BONUS_PI[ruolo]})`,     cls:"pi",      bonus: BONUS_PI[ruolo],      multi:false });
-  if (ruolo === "P")           flags.push({ key:"rigpar",  label:`🧤 Rig.Par (+${BONUS_RIG_PAR})`,      cls:"rigpar",  bonus: BONUS_RIG_PAR,         multi:true  });
+  if (BONUS_GOL[ruolo] > 0)    flags.push({ key:"gol",    label:`${t("flag.gol")} (+${BONUS_GOL[ruolo]})`,       cls:"gol",    bonus: BONUS_GOL[ruolo],    multi:true });
+  if (BONUS_ASSIST[ruolo] > 0) flags.push({ key:"assist",  label:`${t("flag.assist")} (+${BONUS_ASSIST[ruolo]})`, cls:"assist",  bonus: BONUS_ASSIST[ruolo],  multi:true });
+  if (BONUS_PI[ruolo] > 0)     flags.push({ key:"pi",      label:`${t("flag.pi")} (+${BONUS_PI[ruolo]})`,     cls:"pi",      bonus: BONUS_PI[ruolo],      multi:false });
+  if (ruolo === "P")           flags.push({ key:"rigpar",  label:`${t("flag.rigpar")} (+${BONUS_RIG_PAR})`,      cls:"rigpar",  bonus: BONUS_RIG_PAR,         multi:true  });
   // malus uguali per tutti
-  flags.push({ key:"amm",  label:`🟨 Amm (-${MALUS_AMM})`,  cls:"amm",  bonus:-MALUS_AMM,  multi:false });
-  flags.push({ key:"esp",  label:`🟥 Esp (-${MALUS_ESP})`,  cls:"esp",  bonus:-MALUS_ESP,  multi:false });
-  flags.push({ key:"aut",  label:`😬 Aut (-${MALUS_AUT})`,  cls:"aut",  bonus:-MALUS_AUT,  multi:true  });
-  flags.push({ key:"rig",  label:`❌ Rig (-${MALUS_RIG})`,  cls:"rig",  bonus:-MALUS_RIG,  multi:false });
+  flags.push({ key:"amm",  label:`${t("flag.amm")} (-${MALUS_AMM})`,  cls:"amm",  bonus:-MALUS_AMM,  multi:false });
+  flags.push({ key:"esp",  label:`${t("flag.esp")} (-${MALUS_ESP})`,  cls:"esp",  bonus:-MALUS_ESP,  multi:false });
+  flags.push({ key:"aut",  label:`${t("flag.aut")} (-${MALUS_AUT})`,  cls:"aut",  bonus:-MALUS_AUT,  multi:true  });
+  flags.push({ key:"rig",  label:`${t("flag.rig")} (-${MALUS_RIG})`,  cls:"rig",  bonus:-MALUS_RIG,  multi:false });
   if (ruolo === "P")
-    flags.push({ key:"gs", label:`⬇ GS (-${MALUS_GS})`,    cls:"gs",   bonus:-MALUS_GS,   multi:true  });
+    flags.push({ key:"gs", label:`${t("flag.gs")} (-${MALUS_GS})`,    cls:"gs",   bonus:-MALUS_GS,   multi:true  });
   return flags;
 }
 
@@ -198,7 +209,7 @@ function listenLega(legaId){
     state=sanitizeLegaState(d);
     mergePlayerRoseIntoState(); // riapplica iscrizioni/rose self-service
     saveLocalOnly();renderPage(currentPage());
-    if(isNewer) showSyncBar("🔄 Lega aggiornata",2000); // banner SOLO su cambiamento reale
+    if(isNewer) showSyncBar(t("ui.sync_lega"),2000); // banner SOLO su cambiamento reale
   });
 }
 function listenGlobal(){
@@ -211,7 +222,7 @@ function listenGlobal(){
     if((d._updatedAt||0)<=(globalState._updatedAt||0))return;
     globalState=sanitizeGlobalState(d);
     localStorage.setItem("ucl_global",JSON.stringify(globalState));
-    renderPage(currentPage());showSyncBar("🔄 Dati aggiornati",2000);
+    renderPage(currentPage());showSyncBar(t("ui.sync_dati"),2000);
   });
 }
 function listenFirebase(){
@@ -351,7 +362,7 @@ function renderWinnerBanner() {
 
   const max = ranking[0].punti;
   const vincitori = ranking.filter(p => p.punti === max);
-  const legaNome  = currentLegaMeta?.nome || "la tua lega";
+  const legaNome  = currentLegaMeta?.nome || t("winner.default_league");
 
   // Top-3 podio (escluso chi è già nei vincitori se parità)
   const podio = ranking.slice(0, Math.min(3, ranking.length));
@@ -375,8 +386,8 @@ function renderWinnerBanner() {
       <div class="winner-stars">★ ★ ★ ★ ★</div>
       <div class="winner-trophy">🏆</div>
       <h2 class="winner-title">${_escHtml(titolo)}</h2>
-      <p class="winner-subtitle">Vincitore di <strong>${legaNome}</strong> · FIFA World Cup 2026</p>
-      <div class="winner-score">${max.toFixed(1)} punti</div>
+      <p class="winner-subtitle">${t("winner.subtitle",{lega:`<strong>${legaNome}</strong>`})}</p>
+      <div class="winner-score">${max.toFixed(1)} ${t("winner.points")}</div>
       <div class="winner-podio">${podioHtml}</div>
     </div>`;
 }
@@ -540,8 +551,8 @@ function renderClassifica() {
   const medals = ["🥇","🥈","🥉"];
   tbody.innerHTML = rows.map((r,i) => {
     const pos = i+1;
-    const pendingDot = r.pending ? `<span class="pending-dot" title="Voti mancanti"></span>` : "";
-    return `<tr class="${pos<=3?`rank-${pos}`:""} classifica-row-clickable" data-partid="${r.id}" title="Clicca per vedere la rosa">
+    const pendingDot = r.pending ? `<span class="pending-dot" title="${t("giornata_ui.missing_votes")}"></span>` : "";
+    return `<tr class="${pos<=3?`rank-${pos}`:""} classifica-row-clickable" data-partid="${r.id}" title="${t("giornata_ui.click_squad")}">
       <td><span class="rank-num">${pos<=3?medals[i]:pos}</span></td>
       <td><span class="partecipante-name">${_escHtml(r.nome)}</span>${pendingDot}</td>
       <td><span class="punti-g">${r.gPts.toFixed(1)}</span></td>
@@ -580,7 +591,7 @@ function renderStats() {
   if (!wrap) return;
 
   if (!currentLegaId) {
-    wrap.innerHTML = `<p class="hint" style="text-align:center;padding:40px 0">Entra in una lega per vedere le statistiche.</p>`;
+    wrap.innerHTML = `<p class="hint" style="text-align:center;padding:40px 0">${t("stats.enter_league")}</p>`;
     return;
   }
 
@@ -594,7 +605,7 @@ function renderStats() {
   if (!totalParts) {
     wrap.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text2)">
       <span class="material-symbols-outlined" style="font-size:32px;display:block;margin-bottom:8px;animation:spin 1.2s linear infinite">sync</span>
-      <p style="margin:0;font-size:14px">Caricamento statistiche...</p>
+      <p style="margin:0;font-size:14px">${t("stats.loading_stats")}</p>
     </div>`;
     // Retry after 2s in case playerRose data arrives after this render
     setTimeout(() => { if (currentPage() === "stats") renderStats(); }, 2000);
@@ -742,17 +753,17 @@ function renderStats() {
 
       <!-- Chi ha questo giocatore? -->
       <div class="stats-card stats-card--full stats-search-card">
-        <h3 class="stats-card-title">🔍 Chi ha questo giocatore?</h3>
+        <h3 class="stats-card-title">${t("stats.who_has_player")}</h3>
         <div class="stats-search-filters">
-          <select class="stats-search-naz"><option value="">– Squadra –</option></select>
-          <select class="stats-search-player" disabled><option value="">– Giocatore –</option></select>
+          <select class="stats-search-naz"><option value="">${t("ui.team_ph")}</option></select>
+          <select class="stats-search-player" disabled><option value="">${t("ui.player_ph")}</option></select>
         </div>
         <div class="stats-search-result"></div>
       </div>
 
       <!-- Giocatori più scelti -->
       <div class="stats-card stats-card--wide">
-        <h3 class="stats-card-title">🏅 Giocatori più scelti</h3>
+        <h3 class="stats-card-title">${t("stats.most_picked")}</h3>
         <div class="stats-ownership-list">
           ${topPlayers.map((g, i) => {
             const pct = Math.round((g.count / totalParts) * 100);
@@ -770,9 +781,9 @@ function renderStats() {
 
       <!-- Capitani più scelti -->
       <div class="stats-card">
-        <h3 class="stats-card-title">👑 Capitani più scelti</h3>
+        <h3 class="stats-card-title">${t("stats.most_picked_captains")}</h3>
         ${topCaptains.length === 0
-          ? `<p class="hint">Nessun capitano ancora scelto.</p>`
+          ? `<p class="hint">${t("stats.no_captain_yet")}</p>`
           : `<div class="stats-cap-list">
               ${topCaptains.map(([nome, d], i) => {
                 const pct = Math.round((d.count / totalParts) * 100);
@@ -788,8 +799,8 @@ function renderStats() {
 
       <!-- Scelte per nazione -->
       <div class="stats-card">
-        <h3 class="stats-card-title">🗺 Scelte per nazione</h3>
-        <p class="stats-subtitle">Prima: nazioni con più scelte diverse (disaccordo)</p>
+        <h3 class="stats-card-title">${t("stats.picks_by_team")}</h3>
+        <p class="stats-subtitle">${t("stats.picks_disagreement")}</p>
         <div class="stats-naz-scelte-list">
           ${nazioniOrdinate.map(({ naz, picks, unique }) => {
             const picksHtml = picks.map(([nome, cnt]) =>
@@ -806,11 +817,11 @@ function renderStats() {
 
       <!-- Giocatori più redditizi -->
       <div class="stats-card stats-card--wide">
-        <h3 class="stats-card-title">⭐ Giocatori più redditizi</h3>
+        <h3 class="stats-card-title">${t("stats.most_profitable")}</h3>
         ${!hasVoti
-          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          ? `<p class="hint">${t("stats.available_after_votes")}</p>`
           : topScorers.length === 0
-            ? `<p class="hint">Nessun voto inserito ancora.</p>`
+            ? `<p class="hint">${t("stats.no_votes_yet")}</p>`
             : `<div class="stats-scorer-grid">
                 ${topScorers.map((g, i) => `
                   <div class="stats-scorer-row">
@@ -827,11 +838,11 @@ function renderStats() {
 
       <!-- Rendimento capitani -->
       <div class="stats-card stats-card--wide">
-        <h3 class="stats-card-title">🎖 Rendimento capitani</h3>
+        <h3 class="stats-card-title">${t("stats.captain_perf")}</h3>
         ${!hasVoti
-          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          ? `<p class="hint">${t("stats.available_after_votes")}</p>`
           : topCapScorers.length === 0
-            ? `<p class="hint">Nessun capitano con voti ancora.</p>`
+            ? `<p class="hint">${t("stats.no_captain_votes")}</p>`
             : `<div class="stats-scorer-grid">
                 ${topCapScorers.map((c, i) => `
                   <div class="stats-scorer-row">
@@ -849,9 +860,9 @@ function renderStats() {
 
       <!-- SV per partecipante -->
       <div class="stats-card stats-card--wide">
-        <h3 class="stats-card-title">🚑 Giocatori SV per partecipante</h3>
+        <h3 class="stats-card-title">${t("stats.sv_per_part")}</h3>
         ${!hasVoti
-          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          ? `<p class="hint">${t("stats.available_after_votes")}</p>`
           : `<div class="stats-scorer-grid">
               ${svPerPart.map((item, i) => {
                 const cls = item.svCount === 0 ? "stats-sv-zero" : item.svCount <= 3 ? "stats-sv-mid" : "stats-sv-high";
@@ -867,14 +878,14 @@ function renderStats() {
 
       <!-- Bonus e malus per partecipante -->
       <div class="stats-card stats-card--wide">
-        <h3 class="stats-card-title">⚡ Bonus e malus per partecipante</h3>
+        <h3 class="stats-card-title">${t("stats.bm_per_part")}</h3>
         ${!hasVoti
-          ? `<p class="hint">Disponibile dopo l'inserimento dei primi voti.</p>`
+          ? `<p class="hint">${t("stats.available_after_votes")}</p>`
           : `<div class="stats-bm-grid">
               <div class="stats-bm-header">
                 <span></span><span></span>
-                <span class="stats-bm-col-label bns">Bns</span>
-                <span class="stats-bm-col-label mls">Mls</span>
+                <span class="stats-bm-col-label bns">${t("stats.bns")}</span>
+                <span class="stats-bm-col-label mls">${t("stats.mls")}</span>
               </div>
               ${bonusMalusPerPart.map((item, i) => `
                 <div class="stats-bm-row">
@@ -890,7 +901,7 @@ function renderStats() {
 
       <!-- Tracker Sostituzioni -->
       <div class="stats-card stats-card--full">
-        <h3 class="stats-card-title">🔄 Tracker Sostituzioni</h3>
+        <h3 class="stats-card-title">${t("stats.sub_tracker")}</h3>
         <div class="stats-sost-list">
           ${parts.map(p => {
             const sost    = getSostEffective(p.id);
@@ -902,7 +913,7 @@ function renderStats() {
               const sostArr = sost[fId] || [];
               if (!sostArr.length) return "";
               return `<div class="stats-sost-finestra">
-                <span class="stats-sost-finestra-label">${f.label}</span>
+                <span class="stats-sost-finestra-label">${t("ui.window")} ${fId}</span>
                 <div class="stats-sost-swaps">
                   ${sostArr.map(s => {
                     const outNome = s.outNome || s.out || "?";
@@ -919,7 +930,7 @@ function renderStats() {
                 <span class="stats-sost-count ${totalUsed === MAX_SOST_TOTALI ? "full" : totalUsed >= MAX_SOST_TOTALI - 1 ? "low" : ""}">${totalUsed}/${MAX_SOST_TOTALI}</span>
               </div>
               <div class="stats-sost-bar-wrap"><div class="stats-sost-bar ${totalUsed === MAX_SOST_TOTALI ? "full" : ""}" style="width:${pct}%"></div></div>
-              ${finestreHtml || `<p class="hint" style="margin:4px 0 0;font-size:12px">Nessuna sostituzione effettuata.</p>`}
+              ${finestreHtml || `<p class="hint" style="margin:4px 0 0;font-size:12px">${t("stats.no_subs_made")}</p>`}
             </div>`;
           }).join("")}
         </div>
@@ -928,15 +939,15 @@ function renderStats() {
     </div>
   `; } catch(e) {
     console.error("[renderStats] errore rendering:", e);
-    wrap.innerHTML = `<p style="color:var(--accent2);padding:20px">Errore rendering statistiche: ${e.message}</p>`;
+    wrap.innerHTML = `<p style="color:var(--accent2);padding:20px">${t("stats.error_render",{msg:e.message})}</p>`;
   }
 
   // ── Sezione ricerca proprietario ─────────────────────────────
   const nazOpts = SQUADRE.map(n => `<option value="${n}">${n}</option>`).join("");
   const searchCard = wrap.querySelector(".stats-search-card");
   if (searchCard) {
-    searchCard.querySelector(".stats-search-naz").innerHTML = `<option value="">– Squadra –</option>${nazOpts}`;
-    searchCard.querySelector(".stats-search-player").innerHTML = `<option value="">– Giocatore –</option>`;
+    searchCard.querySelector(".stats-search-naz").innerHTML = `<option value="">${t("ui.team_ph")}</option>${nazOpts}`;
+    searchCard.querySelector(".stats-search-player").innerHTML = `<option value="">${t("ui.player_ph")}</option>`;
     searchCard.querySelector(".stats-search-player").disabled = true;
     searchCard.querySelector(".stats-search-result").innerHTML = "";
   }
@@ -948,7 +959,7 @@ function renderStats() {
   if (selNaz && selPlayer && resEl) {
     selNaz.addEventListener("change", () => {
       const naz = selNaz.value;
-      selPlayer.innerHTML = `<option value="">– Giocatore –</option>`;
+      selPlayer.innerHTML = `<option value="">${t("ui.player_ph")}</option>`;
       resEl.innerHTML = "";
       if (!naz) { selPlayer.disabled = true; return; }
       const seen = new Map();
@@ -964,7 +975,7 @@ function renderStats() {
         }
       }
       const giocatori = [...seen.entries()].map(([nome, ruolo]) => ({ nome, ruolo })).sort((a, b) => a.nome.localeCompare(b.nome));
-      selPlayer.innerHTML = `<option value="">– Giocatore –</option>` +
+      selPlayer.innerHTML = `<option value="">${t("ui.player_ph")}</option>` +
         giocatori.map(g => `<option value="${_escHtml(g.nome)}" data-ruolo="${g.ruolo}">${_escHtml(g.nome)}</option>`).join("");
       selPlayer.disabled = false;
     });
@@ -987,11 +998,11 @@ function renderStats() {
         }
       }
       if (!owners.length) {
-        resEl.innerHTML = `<p class="hint" style="margin:12px 0 0">Nessun partecipante ha scelto questo giocatore.</p>`;
+        resEl.innerHTML = `<p class="hint" style="margin:12px 0 0">${t("stats.no_owner_picked")}</p>`;
         return;
       }
       resEl.innerHTML = `<table class="stats-search-table">
-        <thead><tr><th>#</th><th>Partecipante</th></tr></thead>
+        <thead><tr><th>#</th><th>${t("stats.participant")}</th></tr></thead>
         <tbody>${owners.map((n, i) => `<tr><td>${i + 1}</td><td>${_escHtml(n)}</td></tr>`).join("")}</tbody>
       </table>`;
     });
@@ -1009,7 +1020,7 @@ function buildGiornata() {
 
   if (!parts.length) {
     document.getElementById("giornataSummary").innerHTML = "";
-    document.getElementById("giornataAccordion").innerHTML = `<div class="empty-state"><div class="icon">📅</div><p>Nessun partecipante trovato.</p></div>`;
+    document.getElementById("giornataAccordion").innerHTML = `<div class="empty-state"><div class="icon">📅</div><p>${t("giornata_ui.no_participants")}</p></div>`;
     return;
   }
 
@@ -1019,7 +1030,7 @@ function buildGiornata() {
   // Summary strip
   document.getElementById("giornataSummary").innerHTML = scored.map((item, i) => {
     return `<div class="summary-chip${i===0?" top":""}" data-scroll="${item.p.id}">
-      ${item.pending?'<span class="chip-elim" title="Voti mancanti">⚠</span>':""}
+      ${item.pending?'<span class="chip-elim" title="${t("giornata_ui.missing_votes")}">⚠</span>':""}
       <span class="summary-chip-name">${_escHtml(item.p.nome)}</span>
       <span class="summary-chip-pts">${item.pts.toFixed(1)}</span>
     </div>`;
@@ -1053,18 +1064,18 @@ function buildGiornata() {
     if (isHidden) {
       body = `<div style="padding:28px 12px;color:var(--text2);font-size:13px;text-align:center">
         <span class="material-symbols-outlined" style="font-size:34px;opacity:.55">lock</span>
-        <p style="margin:8px 0 0;font-weight:600">Rosa nascosta dal proprietario</p>
-        <p style="margin:2px 0 0;font-size:11px">Sarà visibile dopo il calcio d'inizio</p>
+        <p style="margin:8px 0 0;font-weight:600">${t("giornata_ui.squad_hidden_owner")}</p>
+        <p style="margin:2px 0 0;font-size:11px">${t("giornata_ui.visible_after_kickoff")}</p>
       </div>`;
     } else if (!rosa || !Object.values(rosa).some(a=>a.length)) {
-      body = `<div style="padding:12px;color:var(--text2);font-size:12px;text-align:center">Rosa non caricata</div>`;
+      body = `<div style="padding:12px;color:var(--text2);font-size:12px;text-align:center">${t("giornata_ui.squad_not_loaded")}</div>`;
     } else {
       const trows = Object.keys(RUOLI).map(ruolo => {
         const arr = rosa[ruolo] || [];
         if (!arr.length) return "";
         const sep = `<tr><td colspan="5" style="padding:6px 12px;background:rgba(255,255,255,.02);font-size:11px;color:var(--text2)">
           <span class="ruolo-badge ruolo-${ruolo}" style="font-size:10px;padding:2px 6px">${ruolo}</span>
-          <span style="margin-left:6px;font-weight:600">${RUOLI[ruolo]} · ${arr.length}</span></td></tr>`;
+          <span style="margin-left:6px;font-weight:600">${t("roles."+ruolo+"s")} · ${arr.length}</span></td></tr>`;
         const rows = arr.map(g => {
           const entry  = globalState.voti[g.nazione]?.[gId]?.[safeKey(g.nome)];
           const isCap  = cap === g.nome;
@@ -1095,7 +1106,7 @@ function buildGiornata() {
 
           const elimNaz = isNazioneEliminata(g.nazione, gId);
           const elimStyle = elimNaz ? "opacity:.45;text-decoration:line-through;" : "";
-          const elimBadge = elimNaz ? ' <span title="Club eliminato" style="font-size:10px;text-decoration:none;display:inline-block">🚫</span>' : "";
+          const elimBadge = elimNaz ? ` <span title="${t("giornata_ui.club_eliminated")}" style="font-size:10px;text-decoration:none;display:inline-block">🚫</span>` : "";
 
           return `<tr${isSV?' class="sv"':''}${elimNaz?' class="elim-row"':""}>
             <td class="left" style="font-size:12px;padding:10px 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${elimStyle}">${_escHtml(g.nome)}${capBadge}${elimBadge} <span style="font-size:10px;color:var(--text2);opacity:.8;margin-left:4px">${g.nazione}</span></td>
@@ -1110,11 +1121,11 @@ function buildGiornata() {
 
       body = `<table style="width:100%;border-collapse:collapse;table-layout:fixed">
         <thead><tr>
-          <th style="width:40%;padding:8px 12px;font-size:11px;color:var(--text2);text-align:left;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">Giocatore</th>
-          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">V</th>
-          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">Mls</th>
-          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">Bns</th>
-          <th style="width:15%;padding:8px 12px 8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">Tot</th>
+          <th style="width:40%;padding:8px 12px;font-size:11px;color:var(--text2);text-align:left;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">${t("voti_ui.giocatore")}</th>
+          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">${t("voti_ui.v")}</th>
+          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">${t("voti_ui.mls")}</th>
+          <th style="width:15%;padding:8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">${t("voti_ui.bns")}</th>
+          <th style="width:15%;padding:8px 12px 8px 4px;font-size:11px;color:var(--text2);text-align:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)">${t("voti_ui.tot")}</th>
         </tr></thead>
         <tbody>${trows}</tbody>
       </table>`;
@@ -1122,9 +1133,9 @@ function buildGiornata() {
 
     const pendingWarn = item.pending ? ` <span style="font-size:10px;color:var(--orange)">⚠</span>` : "";
     const lockIcon = isHidden
-      ? ` <span title="Rosa nascosta dal proprietario" style="font-size:12px">🔒</span>`
+      ? ` <span title="${t("giornata_ui.hidden_from_others")}" style="font-size:12px">🔒</span>`
       : isMineHidden
-      ? ` <span title="La tua rosa è nascosta agli altri" style="font-size:11px;opacity:.7">🔒</span>`
+      ? ` <span title="${t("giornata_ui.your_squad_hidden")}" style="font-size:11px;opacity:.7">🔒</span>`
       : "";
     return `<div class="acc-item" id="acc_${p.id}" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
       <div class="acc-header" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s;" data-id="${p.id}">
@@ -1197,15 +1208,15 @@ async function unlockVoti(){
   const hash=await sha256(val);
   if(hash===SUPERADMIN_PWD_HASH && currentUser?.uid===SUPERADMIN_UID){superadminUnlocked=true;navigate("superadmin");return;}
   if(hash===state.pwdHash){votiUnlocked=true;renderVotiPage();}
-  else{document.getElementById("pwdError").textContent="❌ Password errata";document.getElementById("pwdInput").value="";}
+  else{document.getElementById("pwdError").textContent=t("ui.wrong_password");document.getElementById("pwdInput").value="";}
 }
-document.getElementById("btnLogout")?.addEventListener("click", () => { votiUnlocked=false; renderVotiPage(); toast("Sessione terminata."); });
+document.getElementById("btnLogout")?.addEventListener("click", () => { votiUnlocked=false; renderVotiPage(); toast(t("toast.session_ended")); });
 
 // ── VOTI SQUADRE ─────────────────────────────────────────────
 function renderVoti() {
   const sel = document.getElementById("selectSquadra");
   if (sel.options.length <= 1) {
-    let opts = '<option value="">– Seleziona –</option>';
+    let opts = `<option value="">${t("ui.select_placeholder")}</option>`;
     for (const n of SQUADRE) opts += `<option value="${n}">${n}</option>`;
     sel.innerHTML = opts;
   }
@@ -1240,7 +1251,7 @@ function renderVotiTable() {
   const wrap = document.getElementById("votiTable");
   const banner = document.getElementById("votiBanner");
 
-  if (!naz) { wrap.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>Seleziona una squadra.</p></div>`; banner.style.display="none"; return; }
+  if (!naz) { wrap.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>${t("voti_ui.select_team_empty")}</p></div>`; banner.style.display="none"; return; }
 
   const giocatori = getGiocatoriNazione(naz);
   const nazElim   = isNazioneEliminata(naz, gId);
@@ -1250,7 +1261,7 @@ function renderVotiTable() {
   // eliminated banner (priorità massima)
   if (nazElim) {
     banner.className = "voti-banner elim";
-    banner.textContent = `🚫 ${naz} è stata eliminata dal torneo — i voti sono bloccati`;
+    banner.textContent = t("voti_ui.team_eliminated",{naz});
     banner.style.display = "block";
   }
 
@@ -1258,11 +1269,11 @@ function renderVotiTable() {
   const pending = countPendingVotiSquadra(naz, gId);
   if (!nazElim && pending > 0) {
     banner.className = "voti-banner warn";
-    banner.textContent = `⚠ ${pending} giocator${pending===1?"e":"i"} senza voto in questa giornata`;
+    banner.textContent = t("voti_ui.n_players_no_vote",{n:pending});
     banner.style.display = "block";
   } else if (!nazElim && giocatori.length > 0) {
     banner.className = "voti-banner ok";
-    banner.textContent = `✅ Tutti i voti inseriti per questa giornata`;
+    banner.textContent = t("voti_ui.all_votes_in");
     banner.style.display = "block";
   } else {
     banner.style.display = "none";
@@ -1289,9 +1300,9 @@ function renderVotiTable() {
           const isActive = count > 0;
           // Show explicit counter with - / count / + buttons for multi flags
           return `<span class="flag-multi-wrap ${f.cls}${isActive?" active":""}" data-flag="${f.key}" data-nome="${safeKey(g.nome)}">
-            <button class="flag-multi-dec" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="Rimuovi ${f.label}" ${count===0?"disabled":""}>−</button>
+            <button class="flag-multi-dec" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="${t("voti_ui.remove_flag",{label:f.label})}" ${count===0?"disabled":""}>−</button>
             <span class="flag-multi-label" title="${f.label}">${f.label.split(' ')[0]} <span class="flag-multi-count">${count}</span></span>
-            <button class="flag-multi-inc" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="Aggiungi ${f.label}">+</button>
+            <button class="flag-multi-inc" data-flag="${f.key}" data-nome="${safeKey(g.nome)}" title="${t("voti_ui.add_flag",{label:f.label})}">+</button>
           </span>`;
         } else {
           const isActive = !!val;
@@ -1321,7 +1332,7 @@ function renderVotiTable() {
       : `<span style="font-weight:600">${isSV?"<em style='color:var(--text2)'>SV</em>":v!==""?parseFloat(v).toFixed(1):"–"}</span>`;
 
     const svBtn = isEdit
-      ? `<button class="sv-btn${isSV?" active":""}" data-nome="${safeKey(g.nome)}" title="Senza Voto">SV</button>`
+      ? `<button class="sv-btn${isSV?" active":""}" data-nome="${safeKey(g.nome)}" title="${t("voti_ui.sv_title")}">SV</button>`
       : "";
 
     return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"${isSV?' class="sv-row"':""}>
@@ -1330,20 +1341,20 @@ function renderVotiTable() {
       <td class="center">${vInput}${svBtn}</td>
       <td><div class="flags-wrap">${flagsHtml}</div></td>
       <td class="center"><span class="totale-voto-cell${totCls}" id="vtot_${safeId(g.nome)}">${isSV?"SV":v!==""?tot.toFixed(1):"–"}</span></td>
-      ${isEdit?`<td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center"><button class="btn-icon" data-delvoto="${_escHtml(g.nome)}" title="Elimina voto" style="color:var(--orange)">✕</button><button class="btn-icon" data-rm="${_escHtml(g.nome)}" title="Rimuovi giocatore">🗑</button></td>`:"<td></td>"}
+      ${isEdit?`<td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center"><button class="btn-icon" data-delvoto="${_escHtml(g.nome)}" title="${t("voti_ui.delete_vote_title")}" style="color:var(--orange)">✕</button><button class="btn-icon" data-rm="${_escHtml(g.nome)}" title="${t("voti_ui.remove_player_title")}">🗑</button></td>`:"<td></td>"}
     </tr>`;
   }).join("");
 
   wrap.innerHTML = `
     <table class="voti-table">
       <thead><tr>
-        <th>R.</th><th>Giocatore</th>
-        <th class="center">Voto</th>
-        <th>Bonus / Malus</th>
-        <th class="center">Totale</th>
+        <th>${t("voti_ui.ruolo_abbr")}</th><th>${t("voti_ui.giocatore")}</th>
+        <th class="center">${t("voti_ui.voto")}</th>
+        <th>${t("voti_ui.bonus_malus")}</th>
+        <th class="center">${t("voti_ui.totale")}</th>
         <th></th>
       </tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">Nessun giocatore. Aggiungine uno.</td></tr>'}</tbody>
+      <tbody>${rows||`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">${t("voti_ui.no_players_add")}</td></tr>`}</tbody>
     </table>
 `;
 
@@ -1445,10 +1456,10 @@ function renderVotiTable() {
   wrap.querySelectorAll("[data-delvoto]").forEach(btn => {
     btn.addEventListener("click", function() {
       const nome = this.dataset.delvoto;
-      if (!confirm(`Eliminare il voto di ${nome}?`)) return;
+      if (!confirm(t("confirm.delete_vote",{nome}))) return;
       if (globalState.voti[naz]?.[gId]?.[nome]) delete globalState.voti[naz][gId][nome];
       saveState();
-      toast(`Voto di ${nome} eliminato.`);
+      toast(t("toast.vote_deleted_of",{nome}));
       renderVotiTable();
     });
   });
@@ -1457,7 +1468,7 @@ function renderVotiTable() {
   wrap.querySelectorAll("[data-rm]").forEach(btn => {
     btn.addEventListener("click", function() {
       const nome=this.dataset.rm;
-      if (!confirm(`Rimuovere ${nome}?`)) return;
+      if (!confirm(t("confirm.remove_player",{nome}))) return;
       if (state.giocatoriSquadra[naz]) state.giocatoriSquadra[naz]=state.giocatoriSquadra[naz].filter(g=>g.nome!==nome);
       if (globalState.voti[naz]?.[gId]?.[nome]) delete globalState.voti[naz][gId][nome];
       saveState(); renderVotiTable();
@@ -1470,7 +1481,7 @@ function renderVotiTable() {
 document.getElementById("btnSalvaVoti")?.addEventListener("click", () => {
   const naz = document.getElementById("selectSquadra").value;
   const gId = document.getElementById("selectGiornata").value;
-  if (!naz) { toast("Seleziona una squadra!", true); return; }
+  if (!naz) { toast(t("toast.select_team"), true); return; }
   if (!globalState.voti[naz]) globalState.voti[naz]={};
   if (!globalState.voti[naz][gId]) globalState.voti[naz][gId]={};
 
@@ -1489,7 +1500,7 @@ document.getElementById("btnSalvaVoti")?.addEventListener("click", () => {
     }
   });
   saveGlobalState();
-  toast(`✓ Voti salvati – ${naz}, ${GIORNATE[gId]}`);
+  toast(t("toast.votes_saved",{naz, g:GIORNATE[gId]}));
   renderVotiTable();
 });
 
@@ -1517,7 +1528,7 @@ document.getElementById("btnAdminLogout")?.addEventListener("click", () => {
   adminUnlocked=false;
   ["adminLockIcon","adminLockIconMobile"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="🔒";});
   renderAdminPage();
-  toast("Sessione admin terminata.");
+  toast(t("toast.admin_session_ended"));
 });
 
 function renderAdmin(){
@@ -1530,7 +1541,7 @@ function renderAdmin(){
       <span>🏆 <strong>${_escHtml(nome)}</strong> · <span style="font-size:11px;opacity:.7">${currentLegaId}</span></span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn-sec" style="font-size:11px;padding:3px 10px"
-          onclick="navigator.clipboard.writeText('${link}').then(()=>toast('📋 Link copiato!'))">📋 Copia link</button>
+          onclick="navigator.clipboard.writeText('${link}').then(()=>toast('${t("toast.link_copied")}'))">${t("lobby.copy_link")}</button>
         <a href="https://wa.me/?text=${waMsg}" target="_blank" rel="noopener"
           style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:11px;padding:3px 10px;cursor:pointer;text-decoration:none;font-weight:600">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.529 5.855L.057 23.882l6.198-1.625A11.935 11.935 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.504-5.186-1.385l-.372-.22-3.679.965.98-3.585-.242-.379A9.943 9.943 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
@@ -1545,7 +1556,7 @@ function renderAdmin(){
   renderCapitanoForm();
   renderSostituzioni();
   renderAdminDeadline();
-  populateSel("selectPartecipanteImport",state.partecipanti,"nome","id","– Seleziona –","");
+  populateSel("selectPartecipanteImport",state.partecipanti,"nome","id",t("ui.select_placeholder"),"");
   renderRoseStatus();
   loadPushSubCount();
 }
@@ -1560,8 +1571,8 @@ async function loadPushSubCount() {
     );
     const count = snap.val() ? Object.keys(snap.val()).length : 0;
     el.textContent = count
-      ? `🔔 ${count} partecipant${count !== 1 ? "i" : "e"} con notifiche attive`
-      : "Nessun partecipante ha attivato le notifiche";
+      ? t("admin_ui.push_subs_active",{n:count})
+      : t("admin_ui.push_none");
   } catch(e) { el.textContent = ""; }
 }
 
@@ -1571,10 +1582,10 @@ async function sendAdminPush(title, body) {
   const resEl = document.getElementById("pushSendResult");
   const btn   = document.getElementById("btnSendPush");
 
-  if (!currentLegaId) { toast("Nessuna lega attiva", true); return; }
-  if (!b_) { toast("Inserisci un messaggio", true); return; }
+  if (!currentLegaId) { toast(t("toast.no_active_league"), true); return; }
+  if (!b_) { toast(t("toast.enter_message"), true); return; }
 
-  if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Invio..."; }
+  if (btn) { btn.disabled = true; btn.innerHTML = t("admin_ui.push_sending"); }
   if (resEl) resEl.textContent = "";
 
   try {
@@ -1591,14 +1602,14 @@ async function sendAdminPush(title, body) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    if (resEl) resEl.innerHTML = `<span style="color:var(--green)">✓ Inviate: ${data.sent ?? "?"} · Fallite: ${data.failed ?? 0}</span>`;
-    toast(`🔔 Push inviata a ${data.sent ?? "?"} utenti!`);
+    if (resEl) resEl.innerHTML = `<span style="color:var(--green)">${t("admin_ui.push_result",{sent:data.sent ?? "?", failed:data.failed ?? 0})}</span>`;
+    toast(t("toast.push_sent",{n:data.sent ?? "?"}));
   } catch(e) {
-    if (resEl) resEl.innerHTML = `<span style="color:var(--red)">Errore: ${e.message}</span>`;
-    toast("Errore invio push", true);
+    if (resEl) resEl.innerHTML = `<span style="color:var(--red)">${t("admin_ui.push_error",{msg:e.message})}</span>`;
+    toast(t("toast.push_send_error"), true);
     console.error(e);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">send</span> Invia a tutti'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = `<span class="material-symbols-outlined">send</span> ${t("admin_ui.send_all")}`; }
   }
 }
 
@@ -1618,29 +1629,29 @@ function renderAdminDeadline(){
     const pad = n => String(n).padStart(2,'0');
     inp.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     if(st) st.textContent = isDeadlinePassata()
-      ? `🔒 Deadline superata (${d.toLocaleString('it-IT')}): rose bloccate, solo sostituzioni.`
-      : `⏳ Deadline: ${d.toLocaleString('it-IT')} — rose modificabili fino ad allora.`;
+      ? t("admin_ui.deadline_passed",{d:d.toLocaleString('it-IT')})
+      : t("admin_ui.deadline_active",{d:d.toLocaleString('it-IT')});
   } else {
     inp.value = "";
-    if(st) st.textContent = "Nessuna scadenza impostata: le rose sono sempre modificabili.";
+    if(st) st.textContent = t("admin_ui.no_deadline_set");
   }
 }
 
 function resetPartecipantiERose() {
-  if (!confirm("⚠️ Sei sicuro? Verranno eliminati TUTTI i partecipanti, le rose e i giocatori nel tab Voti. I voti inseriti rimarranno.")) return;
+  if (!confirm(t("confirm.reset_participants"))) return;
   state.partecipanti = [];
   state.rose = {};
   state.sostituzioni = {};
   state.giocatoriSquadra = {};
   saveState();
   renderAdmin();
-  toast("Partecipanti, rose e giocatori eliminati.");
+  toast(t("toast.participants_reset"));
 }
 
 async function eliminaLega() {
   const nome = currentLegaMeta?.nome || currentLegaId;
-  if (!confirm(`⚠️ Stai per eliminare la lega "${nome}" (${currentLegaId}).\n\nQuesta azione è IRREVERSIBILE: tutti i dati verranno persi.\n\nConfermi?`)) return;
-  if (!confirm(`Ultima conferma: eliminare definitivamente la lega "${nome}"?`)) return;
+  if (!confirm(t("confirm.delete_league_1",{nome, id:currentLegaId}))) return;
+  if (!confirm(t("confirm.delete_league_2",{nome}))) return;
   try {
     // Elimina lega da Firebase
     await window._set(window._ref(window._db, "indice/" + currentLegaId), null);
@@ -1649,13 +1660,13 @@ async function eliminaLega() {
     if (currentUser) {
       await window._set(window._ref(window._db, "users/" + currentUser.uid + "/leghe/" + currentLegaId), null);
     }
-    toast("Lega eliminata.");
+    toast(t("toast.league_deleted"));
     exitLega();
   } catch(e) {
     console.error("eliminaLega error:", e);
     const msg = e.code === "PERMISSION_DENIED"
-      ? "Permesso negato — assicurati di essere l'admin e di aver aggiornato le regole Firebase."
-      : "Errore durante l'eliminazione: " + e.message;
+      ? t("admin_ui.perm_denied")
+      : t("admin_ui.delete_error",{msg:e.message});
     toast(msg, true);
   }
 }
@@ -1665,21 +1676,21 @@ document.addEventListener("click", e => {
   if (e.target && e.target.id === "btnEliminaLega") eliminaLega();
   if (e.target && e.target.id === "btnSalvaDeadline") {
     const inp = document.getElementById("adminDeadlineInput");
-    if (!inp || !inp.value) { toast("Inserisci una data/ora.", true); return; }
+    if (!inp || !inp.value) { toast(t("toast.enter_datetime"), true); return; }
     state.deadline = new Date(inp.value).toISOString();
-    saveState(); renderAdminDeadline(); toast("Deadline salvata.");
+    saveState(); renderAdminDeadline(); toast(t("toast.deadline_saved"));
   }
   if (e.target && e.target.id === "btnRimuoviDeadline") {
     state.deadline = null;
-    saveState(); renderAdminDeadline(); toast("Deadline rimossa: rose sempre modificabili.");
+    saveState(); renderAdminDeadline(); toast(t("toast.deadline_removed"));
   }
   if (e.target && e.target.id === "btnSendPush") sendAdminPush();
   if (e.target && e.target.id === "btnPushPresetVoti") {
     const gLabel = GIORNATE[globalState.giornataCorrente || "1"];
-    sendAdminPush("⚽ Voti disponibili!", `I voti della ${gLabel} sono pronti. Controlla la classifica!`);
+    sendAdminPush(t("push.voti_title"), t("push.voti_body",{g:gLabel}));
   }
   if (e.target && e.target.id === "btnPushPresetClassifica") {
-    sendAdminPush("🏆 Classifica aggiornata!", "La classifica è stata aggiornata. Vieni a vedere la tua posizione!");
+    sendAdminPush(t("push.classifica_title"), t("push.classifica_body"));
   }
 });
 
@@ -1688,7 +1699,7 @@ function renderRoseStatus() {
   const loaded = state.partecipanti.filter(p => state.rose[p.id] && Object.values(state.rose[p.id]).some(a=>a.length)).length;
   const pct    = tot ? Math.round(loaded/tot*100) : 0;
   const div    = document.getElementById("adminRoseStatus");
-  div.innerHTML = `<span>Rose caricate:</span><span class="rs-count">${loaded}/${tot}</span>
+  div.innerHTML = `<span>${t("admin_ui.rose_loaded_label")}</span><span class="rs-count">${loaded}/${tot}</span>
     <div class="rose-progress"><div class="rose-progress-inner" style="width:${pct}%"></div></div>
     <span style="font-size:11px;color:var(--text2)">${pct}%</span>`;
 }
@@ -1700,13 +1711,13 @@ function renderPartecipantiList() {
   // update counter badge in card title
   const counter = document.getElementById("partecipantiCounter");
   if (counter) counter.textContent = state.partecipanti.length ? `(${state.partecipanti.length})` : "";
-  if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) { list.innerHTML=`<p class="hint">Nessun partecipante ancora.</p>`; return; }
+  if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) { list.innerHTML=`<p class="hint">${t("admin_ui.none_yet")}</p>`; return; }
   list.innerHTML = state.partecipanti.map(p => {
     const hasRosa = state.rose[p.id] && Object.values(state.rose[p.id]).some(a=>a.length);
     return `<div class="partecipante-item">
       <span>${_escHtml(p.nome)}</span>
       <div class="part-item-actions">
-        <span class="${hasRosa?"rosa-loaded":"rosa-missing"}">${hasRosa?"✓ Rosa caricata":"✗ Rosa mancante"}</span>
+        <span class="${hasRosa?"rosa-loaded":"rosa-missing"}">${hasRosa?t("admin_ui.rosa_loaded"):t("admin_ui.rosa_missing")}</span>
         <button class="btn-del" data-id="${p.id}">✕</button>
       </div>
     </div>`;
@@ -1714,10 +1725,10 @@ function renderPartecipantiList() {
   list.querySelectorAll(".btn-del").forEach(btn => {
     btn.addEventListener("click", function() {
       const nome=state.partecipanti.find(p=>p.id===this.dataset.id)?.nome;
-      if (!confirm(`Rimuovere ${nome}?`)) return;
+      if (!confirm(t("confirm.remove_player",{nome}))) return;
       state.partecipanti=state.partecipanti.filter(p=>p.id!==this.dataset.id);
       delete state.rose[this.dataset.id];
-      saveState(); renderAdmin(); toast("Partecipante rimosso.");
+      saveState(); renderAdmin(); toast(t("toast.participant_removed"));
     });
   });
 }
@@ -1726,16 +1737,16 @@ function addPartecipante() {
   const inp = document.getElementById("newPartecipanteNome");
   if (!inp) return;
   const nome = inp.value.trim();
-  if (!nome) { toast("Inserisci un nome!", true); inp.focus(); return; }
+  if (!nome) { toast(t("toast.enter_name"), true); inp.focus(); return; }
   if (!Array.isArray(state.partecipanti)) state.partecipanti = [];
-  if (state.partecipanti.find(p=>p.nome.toLowerCase()===nome.toLowerCase())) { toast(`"${nome}" è già presente!`, true); return; }
+  if (state.partecipanti.find(p=>p.nome.toLowerCase()===nome.toLowerCase())) { toast(t("toast.already_present",{nome}), true); return; }
   const id = Date.now().toString();
   state.partecipanti.push({id, nome, capitanoGiocatore:null});
   inp.value="";
   inp.focus();
   saveState();
   renderAdmin();
-  toast(`✓ ${nome} aggiunto!`);
+  toast(t("toast.participant_added",{nome}));
 }
 
 // Use event delegation so it works regardless of when DOM is ready
@@ -1750,22 +1761,22 @@ document.addEventListener("keydown", e => {
 
 function renderCapitanoForm() {
   const div=document.getElementById("capitanoForm");
-  if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) { div.innerHTML=`<p class="hint">Nessun partecipante.</p>`; return; }
+  if (!Array.isArray(state.partecipanti) || !state.partecipanti.length) { div.innerHTML=`<p class="hint">${t("admin_ui.none_participants")}</p>`; return; }
   div.innerHTML=state.partecipanti.map(p=>{
     const rosa=state.rose[p.id];
     const nonAtt=rosa?Object.entries(rosa).flatMap(([r,arr])=>r!=="A"?arr.map(g=>({...g,ruolo:r})):[]): [];
     const opts=nonAtt.length
       ?nonAtt.map(g=>`<option value="${_escHtml(g.nome)}" ${p.capitanoGiocatore===g.nome?"selected":""}>${_escHtml(g.nome)} (${g.ruolo}) – ${g.nazione}</option>`).join("")
-      :"<option value=''>Carica prima la rosa</option>";
+      :`<option value=''>${t("admin_ui.load_first_squad")}</option>`;
     return `<div class="capitano-row">
       <span>${_escHtml(p.nome)}</span>
-      <select data-pid="${p.id}" class="sel-cap"><option value="">– Nessuno –</option>${opts}</select>
+      <select data-pid="${p.id}" class="sel-cap"><option value="">${t("ui.none")}</option>${opts}</select>
     </div>`;
   }).join("");
   div.querySelectorAll(".sel-cap").forEach(sel=>{
     sel.addEventListener("change",function(){
       const part=state.partecipanti.find(p=>p.id===this.dataset.pid);
-      if(part){part.capitanoGiocatore=this.value||null;saveState();toast("Capitano salvato!");}
+      if(part){part.capitanoGiocatore=this.value||null;saveState();toast(t("toast.captain_saved"));}
     });
   });
 }
@@ -1779,7 +1790,7 @@ document.getElementById("btnExportJSON")?.addEventListener("click", () => {
   const a    = document.createElement("a");
   a.href = url; a.download = `fantasy_arena_backup_${new Date().toISOString().slice(0,10)}.json`;
   a.click(); URL.revokeObjectURL(url);
-  toast("Backup esportato!");
+  toast(t("toast.backup_exported"));
 });
 
 document.getElementById("btnImportJSON")?.addEventListener("click", () => {
@@ -1793,13 +1804,13 @@ document.getElementById("importJSONInput")?.addEventListener("change", e => {
     try {
       const data = JSON.parse(ev.target.result);
       if (!data.partecipanti) throw new Error("Formato non valido");
-      if (!confirm(`Importare i dati? Sovrascriverà i dati attuali.`)) return;
+      if (!confirm(t("confirm.import_data"))) return;
       state = data;
       saveState();
       renderAdmin();
-      toast("Dati importati con successo!");
+      toast(t("toast.data_imported"));
     } catch(err) {
-      toast("Errore: file JSON non valido.", true);
+      toast(t("toast.invalid_json"), true);
     }
   };
   reader.readAsText(file);
@@ -1810,11 +1821,11 @@ document.getElementById("importJSONInput")?.addEventListener("change", e => {
 document.getElementById("btnSyncNow")?.addEventListener("click", () => {
   const res = document.getElementById("syncResult");
   if (!window._fbReady) {
-    res.style.color="var(--red)"; res.textContent="Firebase non configurato. Modifica index.html.";
+    res.style.color="var(--red)"; res.textContent=t("admin_ui.firebase_not_configured");
     return;
   }
   syncToFirebase();
-  res.style.color="var(--green)"; res.textContent="✓ Sync avviato!";
+  res.style.color="var(--green)"; res.textContent=t("admin_ui.sync_started");
   setTimeout(()=>res.textContent="",3000);
 });
 
@@ -1830,7 +1841,7 @@ rosaFileInput.addEventListener("change",e=>{if(e.target.files[0])processRosaFile
 function processRosaFile(file) {
   const partId=document.getElementById("selectPartecipanteImport").value;
   const res=document.getElementById("importResult");
-  if (!partId) { res.style.color="var(--red)"; res.textContent="Seleziona prima un partecipante!"; return; }
+  if (!partId) { res.style.color="var(--red)"; res.textContent=t("admin_ui.select_first_participant"); return; }
   const ext=file.name.split(".").pop().toLowerCase();
   if (ext==="csv") {
     const reader=new FileReader();
@@ -1839,13 +1850,13 @@ function processRosaFile(file) {
       if (rosa) {
         state.rose[partId]=rosa; syncGiocatori(); saveState();
         const counts=Object.entries(rosa).map(([r,a])=>`${r}:${a.length}`).join(" ");
-        res.style.color="var(--green)"; res.textContent=`✓ Rosa importata! (${counts})`;
-        renderCapitanoForm(); renderRoseStatus(); toast("Rosa caricata!");
-      } else { res.style.color="var(--red)"; res.textContent="Formato non riconosciuto."; }
+        res.style.color="var(--green)"; res.textContent=t("admin_ui.squad_imported",{counts});
+        renderCapitanoForm(); renderRoseStatus(); toast(t("toast.squad_loaded"));
+      } else { res.style.color="var(--red)"; res.textContent=t("admin_ui.format_not_recognized"); }
     };
     reader.readAsText(file);
   } else {
-    res.style.color="var(--accent2)"; res.textContent="Per Excel: salva come CSV poi ricarica.";
+    res.style.color="var(--accent2)"; res.textContent=t("admin_ui.excel_hint");
   }
 }
 
@@ -1919,7 +1930,7 @@ function syncGiocatori(){
 
 // ── MODAL MANUALE ─────────────────────────────────────────────
 document.getElementById("btnManualRosa")?.addEventListener("click",()=>{
-  populateSel("manualPartSelect",state.partecipanti,"nome","id","– Seleziona –","");
+  populateSel("manualPartSelect",state.partecipanti,"nome","id",t("ui.select_placeholder"),"");
   buildManualForm(document.getElementById("manualPartSelect").value);
   document.getElementById("modalManual").style.display="flex";
 });
@@ -1935,7 +1946,7 @@ function buildManualForm(partId) {
     return `<div class="manual-ruolo-section" data-ruolo="${ruolo}">
       <div class="manual-ruolo-title"><span class="ruolo-badge ruolo-${ruolo}">${ruolo}</span><span>${_escHtml(nome)}</span></div>
       <div class="manual-giocatori-list" id="manList_${ruolo}">${rows}</div>
-      <button class="btn-add-gioc" data-add="${ruolo}">+ Aggiungi ${ruolo}</button>
+      <button class="btn-add-gioc" data-add="${ruolo}">${t("sost.add")} ${ruolo}</button>
     </div>`;
   }).join("");
   form.querySelectorAll("[data-add]").forEach(btn=>{
@@ -1951,8 +1962,8 @@ function buildManualForm(partId) {
 function manualRow(ruolo,idx,nome,nazione) {
   const opts=SQUADRE.map(n=>`<option value="${n}" ${n===nazione?"selected":""}>${n}</option>`).join("");
   return `<div class="manual-gioc-row" data-ruolo="${ruolo}">
-    <input type="text" class="inp-man-nome" placeholder="Nome giocatore" value="${_escHtml(nome)}">
-    <select class="inp-man-naz"><option value="">– Nazione –</option>${opts}</select>
+    <input type="text" class="inp-man-nome" placeholder="${t("sost.player_name")}" value="${_escHtml(nome)}">
+    <select class="inp-man-naz"><option value="">${t("ui.team_ph")}</option>${opts}</select>
     <button class="btn-rm-gioc" type="button">✕</button>
   </div>`;
 }
@@ -1961,7 +1972,7 @@ document.getElementById("manualRosaForm")?.addEventListener("click",e=>{
 });
 document.getElementById("btnSalvaManual")?.addEventListener("click",()=>{
   const partId=document.getElementById("manualPartSelect").value;
-  if (!partId){toast("Seleziona un partecipante!",true);return;}
+  if (!partId){toast(t("toast.select_participant"),true);return;}
   const rosa={P:[],D:[],C:[],A:[]};
   document.querySelectorAll("#manualRosaForm .manual-gioc-row").forEach(row=>{
     const r=row.dataset.ruolo,nome=row.querySelector(".inp-man-nome").value.trim();
@@ -1969,11 +1980,11 @@ document.getElementById("btnSalvaManual")?.addEventListener("click",()=>{
     if(nome&&naz&&rosa[r])rosa[r].push({nome,nazione:naz});
   });
   const tot=Object.values(rosa).reduce((s,a)=>s+a.length,0);
-  if(!tot){toast("Nessun giocatore inserito!",true);return;}
+  if(!tot){toast(t("toast.no_player_entered"),true);return;}
   state.rose[partId]=rosa;syncGiocatori();saveState();
   renderCapitanoForm();renderRoseStatus();
   document.getElementById("modalManual").style.display="none";
-  toast(`Rosa salvata! (${tot} giocatori)`);
+  toast(t("toast.squad_saved_count",{tot}));
 });
 
 
@@ -1988,12 +1999,12 @@ function renderGrafico() {
 
   if (!state.partecipanti || !state.partecipanti.length) {
     if (_graficoChart) { _graficoChart.destroy(); _graficoChart = null; }
-    wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>Nessun dato disponibile.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>${t("common.no_data")}</p></div>`;
     return;
   }
 
   if (typeof Chart === "undefined") {
-    wrap.innerHTML = `<div class="empty-state"><p>Grafico non disponibile offline.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><p>${t("giornata_ui.chart_offline")}</p></div>`;
     return;
   }
 
@@ -2014,7 +2025,7 @@ function renderGrafico() {
   const playedIds   = giornateIds.filter(id => now >= (GIORNATE_KICKOFF[id] ?? Infinity));
 
   if (!playedIds.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>Il torneo non è ancora iniziato.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📈</div><p>${t("giornata_ui.tournament_not_started")}</p></div>`;
     return;
   }
 
@@ -2209,11 +2220,11 @@ function renderChat() {
   if (!wrap) return;
 
   if (!currentLegaId) {
-    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">Entra in una lega per usare la chat.</div>`;
+    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">${t("chat.enter_league")}</div>`;
     return;
   }
   if (!currentUser) {
-    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">Accedi per usare la chat.</div>`;
+    if (msgEl) msgEl.innerHTML = `<div class="chat-empty">${t("chat.login_to_use")}</div>`;
     return;
   }
 
@@ -2274,7 +2285,7 @@ function _escHtml(str) {
 
 async function _sendChatMessage(text) {
   if (!currentLegaId || !currentUser || !text) return;
-  if (!window._push || !window._db) { toast("Firebase non disponibile", true); return; }
+  if (!window._push || !window._db) { toast(t("toast.firebase_unavailable"), true); return; }
   const nome = currentUser.displayName || currentUser.email?.split("@")[0] || "Anonimo";
   try {
     await window._push(window._ref(window._db, `leghe/${currentLegaId}/chat`), {
@@ -2284,7 +2295,7 @@ async function _sendChatMessage(text) {
       ts: Date.now()
     });
   } catch(e) {
-    toast("Errore invio messaggio", true);
+    toast(t("toast.msg_send_error"), true);
     console.error(e);
   }
 }
@@ -2308,14 +2319,14 @@ function urlBase64ToUint8Array(base64String) {
 
 async function subscribeToPush() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    toast("Push non supportato dal browser", true); return;
+    toast(t("toast.push_not_supported"), true); return;
   }
   if (!currentLegaId || !currentUser) {
-    toast("Entra in una lega per attivare le notifiche", true); return;
+    toast(t("toast.enter_league_for_push"), true); return;
   }
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") { toast("Notifiche non autorizzate", true); return; }
+    if (permission !== "granted") { toast(t("toast.notif_not_authorized"), true); return; }
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
@@ -2327,11 +2338,11 @@ async function subscribeToPush() {
       body: JSON.stringify({ subscription: sub.toJSON(), legaId: currentLegaId, uid: currentUser.uid })
     });
     if (!res.ok) throw new Error("Server error");
-    toast("🔔 Notifiche attivate!");
+    toast(t("toast.notif_enabled"));
     _updatePushBtn(true);
   } catch(e) {
     console.error(e);
-    toast("Errore attivazione notifiche", true);
+    toast(t("toast.notif_enable_error"), true);
   }
 }
 
@@ -2340,17 +2351,17 @@ async function unsubscribeFromPush() {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if (sub) await sub.unsubscribe();
-    toast("🔕 Notifiche disattivate");
+    toast(t("toast.notif_disabled"));
     _updatePushBtn(false);
   } catch(e) {
-    toast("Errore disattivazione notifiche", true);
+    toast(t("toast.notif_disable_error"), true);
   }
 }
 
 async function _updatePushBtn(subscribed) {
   const btn = document.getElementById("btnPushToggle");
   if (!btn) return;
-  btn.textContent = subscribed ? "🔕 Disattiva notifiche" : "🔔 Attiva notifiche";
+  btn.textContent = subscribed ? t("ui.push_toggle_off") : t("ui.push_toggle_on");
   btn.onclick = subscribed ? unsubscribeFromPush : subscribeToPush;
 }
 
@@ -2593,7 +2604,7 @@ function renderSostituzioni() {
   const div = document.getElementById("sostituzioniForm");
   if (!div) return;
   if (!state.partecipanti || !state.partecipanti.length) {
-    div.innerHTML = `<p class="hint">Nessun partecipante.</p>`; return;
+    div.innerHTML = `<p class="hint">${t("admin_ui.none_participants")}</p>`; return;
   }
 
   // ── Filtro partecipante ──
@@ -2603,7 +2614,7 @@ function renderSostituzioni() {
 
   const filterBar = `<div class="sost-filter-bar">
     <div class="filter-item">
-      <label>Partecipante</label>
+      <label>${t("stats.participant")}</label>
       <select id="sostPartSelect">${partOpts}</select>
     </div>
   </div>`;
@@ -2635,15 +2646,15 @@ function renderSostituzioni() {
         ? '<span class="sost-admin-badge">admin</span>'
         : '<span class="sost-player-badge">player</span>';
       return `<div class="sost-storico-row">
-        <span class="sost-finestra-badge">F${f.id}</span>
+        <span class="sost-finestra-badge">${t("ui.window_abbr")}${f.id}</span>
         <span class="ruolo-badge ruolo-${s.ruolo}">${s.ruolo}</span>
         ${typeBadge}
         <span class="sost-out">▼ ${_escHtml(outNome)}</span>
         <span class="sost-arrow">→</span>
         <span class="sost-in">▲ ${_escHtml(inNome)}</span>
         <span class="sost-naz">(${naz})</span>
-        <button class="sost-edit-admin" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Modifica">✏️</button>
-        <button class="btn-del sost-del" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="Elimina">🗑️</button>
+        <button class="sost-edit-admin" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="${t("ui.edit")}">✏️</button>
+        <button class="btn-del sost-del" data-pid="${p.id}" data-fid="${f.id}" data-idx="${si}" data-type="${isAdminFin ? 'admin' : 'player'}" data-uid="${uid || ''}" title="${t("common.delete")}">🗑️</button>
       </div>`;
     });
   }).join("");
@@ -2671,64 +2682,64 @@ function renderSostituzioni() {
 
     // Header finestra con pulsante apri/chiudi
     const usedBadge = ruoliUsati.length
-      ? `<span style="font-size:11px;color:var(--text2)">Ruoli usati: ${ruoliUsati.join(", ")}</span>` : "";
+      ? `<span style="font-size:11px;color:var(--text2)">${t("sost.roles_used",{roles:ruoliUsati.join(", ")})}</span>` : "";
     const canOpen = rosa && !limitRagg && ruoliDisp.length > 0;
-    const btnLabel = isAperta ? "▲ Chiudi" : "＋ Aggiungi sostituzione";
+    const btnLabel = isAperta ? t("sost.close") : t("sost.add_sub");
     const btnStyle = isAperta ? "btn-sec" : "btn-primary";
 
     let formHtml = "";
     if (isAperta) {
-      const ruoliOpts = ruoliDisp.map(r => `<option value="${r}">${r} – ${RUOLI[r]}</option>`).join("");
+      const ruoliOpts = ruoliDisp.map(r => `<option value="${r}">${r} – ${t("roles."+r+"s")}</option>`).join("");
       formHtml = `<div class="sost-form-row" data-pid="${p.id}" data-fid="${f.id}">
         <div class="filter-item">
-          <label>Ruolo</label>
+          <label>${t("sost.role")}</label>
           <select class="sost-sel-ruolo" data-pid="${p.id}" data-fid="${f.id}">${ruoliOpts}</select>
         </div>
         <div class="filter-item">
-          <label>▼ Togli (OUT)</label>
-          <select class="sost-sel-out" data-pid="${p.id}" data-fid="${f.id}"><option value="">– Seleziona –</option></select>
+          <label>${t("sost.take_out")}</label>
+          <select class="sost-sel-out" data-pid="${p.id}" data-fid="${f.id}"><option value="">${t("ui.select_placeholder")}</option></select>
         </div>
         <div class="filter-item">
-          <label>▲ Metti (IN)</label>
-          <select class="sost-sel-in" data-pid="${p.id}" data-fid="${f.id}"><option value="">– prima seleziona OUT –</option></select>
+          <label>${t("sost.put_in")}</label>
+          <select class="sost-sel-in" data-pid="${p.id}" data-fid="${f.id}"><option value="">${t("sost.first_select_out")}</option></select>
         </div>
-        <button class="btn-primary sost-btn-add" data-pid="${p.id}" data-fid="${f.id}" style="align-self:flex-end">✓ Conferma</button>
+        <button class="btn-primary sost-btn-add" data-pid="${p.id}" data-fid="${f.id}" style="align-self:flex-end">${t("sost.confirm")}</button>
       </div>
       <div class="sost-nuovo-wrap" id="sostNuovo_${p.id}_${f.id}" style="display:none">
         <div class="sost-nuovo-box">
-          <p style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:10px">✏️ Nuovo giocatore — nazione e ruolo verranno ereditati automaticamente</p>
+          <p style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:10px">${t("sost.new_player_hint")}</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
             <div class="filter-item" style="flex:1;min-width:150px">
-              <label>Nome giocatore</label>
+              <label>${t("sost.player_name")}</label>
               <input type="text" class="sost-nuovo-nome" placeholder="Es. Camavinga" data-pid="${p.id}" data-fid="${f.id}">
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;color:var(--text2)">Nazione</label>
+              <label style="font-size:11px;color:var(--text2)">${t("sost.nation")}</label>
               <span class="sost-nuovo-naz-label" style="font-size:13px;font-weight:700;color:var(--text2);padding:8px 11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;min-width:100px">–</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;color:var(--text2)">Ruolo</label>
+              <label style="font-size:11px;color:var(--text2)">${t("sost.role")}</label>
               <span class="sost-nuovo-ruolo-label" style="font-size:13px;font-weight:700;color:var(--text2);padding:8px 11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;min-width:40px">–</span>
             </div>
-            <button class="btn-primary sost-btn-nuovo" data-pid="${p.id}" data-fid="${f.id}" style="align-self:flex-end">+ Aggiungi</button>
+            <button class="btn-primary sost-btn-nuovo" data-pid="${p.id}" data-fid="${f.id}" style="align-self:flex-end">${t("sost.add")}</button>
           </div>
         </div>
       </div>`;
     }
 
     const limitMsg = !rosa
-      ? `<p class="hint" style="margin:0">Carica prima la rosa.</p>`
+      ? `<p class="hint" style="margin:0">${t("sost.load_squad_first")}</p>`
       : limitRagg
-      ? `<p class="hint" style="margin:0;color:var(--red)">Limite di ${MAX_SOST_TOTALI} sostituzioni totali raggiunto.</p>`
+      ? `<p class="hint" style="margin:0;color:var(--red)">${t("sost.limit_reached",{max:MAX_SOST_TOTALI})}</p>`
       : ruoliDisp.length === 0
-      ? `<p class="hint" style="margin:0">Tutti i ruoli già usati in questa finestra.</p>`
+      ? `<p class="hint" style="margin:0">${t("sost.all_roles_used")}</p>`
       : "";
 
     return `<div class="sost-finestra-block">
       <div class="sost-finestra-title">
-        <span class="sost-finestra-badge">F${f.id}</span>
-        <span style="font-weight:700">${f.label}</span>
-        <span class="hint" style="margin:0;font-size:11px">${f.desc}</span>
+        <span class="sost-finestra-badge">${t("ui.window_abbr")}${f.id}</span>
+        <span style="font-weight:700">${t("ui.window")} ${f.id}</span>
+        <span class="hint" style="margin:0;font-size:11px">${t("sost.window_desc",{a:f.id*5, b:f.id*5+1})}</span>
         ${usedBadge}
         <div style="margin-left:auto">
           ${canOpen
@@ -2744,7 +2755,7 @@ function renderSostituzioni() {
     `<div class="sost-partecipante-block">
       <div class="sost-part-header">
         <span class="sost-part-nome">${_escHtml(p.nome)}</span>
-        <span class="sost-counter ${totRim===0?"zero":totRim<=1?"low":""}">${totUsate}/${MAX_SOST_TOTALI} sostituzioni usate</span>
+        <span class="sost-counter ${totRim===0?"zero":totRim<=1?"low":""}">${t("sost.subs_used",{used:totUsate, max:MAX_SOST_TOTALI})}</span>
       </div>
       ${storicoRows ? `<div class="sost-storico">${storicoRows}</div>` : ""}
       ${finestreHtml}
@@ -2786,12 +2797,12 @@ function populateSostOut(ruoloSel) {
   if (!rosa || !ruolo) return;
 
   const capitanoNomeAdmin = state.partecipanti?.find(p => p.id === pid)?.capitanoGiocatore || null;
-  outSel.innerHTML = `<option value="">– Seleziona –</option>` +
+  outSel.innerHTML = `<option value="">${t("ui.select_placeholder")}</option>` +
     (rosa[ruolo] || [])
       .filter(g => g.nome !== capitanoNomeAdmin)  // il capitano non può essere sostituito
       .map(g => `<option value="${_escHtml(g.nome)}" data-naz="${g.nazione}">${_escHtml(g.nome)} (${g.nazione})</option>`)
       .join("");
-  inSel.innerHTML = `<option value="">– prima seleziona OUT –</option>`;
+  inSel.innerHTML = `<option value="">${t("sost.first_select_out")}</option>`;
 
   // reset nuovo box
   const nuovoWrap = document.getElementById(`sostNuovo_${pid}_${fid}`);
@@ -2802,15 +2813,15 @@ function populateSostOut(ruoloSel) {
     const naz = opt?.dataset?.naz;
     const nuovoWrap2 = document.getElementById(`sostNuovo_${pid}_${fid}`);
     if (!naz) {
-      inSel.innerHTML = `<option value="">– prima seleziona OUT –</option>`;
+      inSel.innerHTML = `<option value="">${t("sost.first_select_out")}</option>`;
       if (nuovoWrap2) nuovoWrap2.style.display = "none";
       return;
     }
     // Tutti i giocatori noti stessa nazione + ruolo, escluso OUT
     const candidati = getGiocatoriNazioneRuolo(naz, ruolo, this.value);
-    inSel.innerHTML = `<option value="">– Seleziona –</option>` +
+    inSel.innerHTML = `<option value="">${t("ui.select_placeholder")}</option>` +
       candidati.map(g => `<option value="${_escHtml(g.nome)}">${_escHtml(g.nome)}</option>`).join("") +
-      `<option value="__nuovo__">✏️ Nuovo giocatore...</option>`;
+      `<option value="__nuovo__">${t("sost.new_player")}</option>`;
 
     // Update nuovo box labels
     if (nuovoWrap2) {
@@ -2834,7 +2845,7 @@ function populateSostOut(ruoloSel) {
 }
 
 function confirmaSostituzione(pid, fid, ruolo, outNome, naz, inNome) {
-  if (!ruolo || !outNome || !inNome || !naz) { toast("Compila tutti i campi!", true); return false; }
+  if (!ruolo || !outNome || !inNome || !naz) { toast(t("toast.fill_all_fields"), true); return false; }
   if (!state.sostituzioni) state.sostituzioni = {};
   if (!state.sostituzioni[pid]) state.sostituzioni[pid] = {};
   if (!state.sostituzioni[pid][fid]) state.sostituzioni[pid][fid] = [];
@@ -2850,7 +2861,7 @@ function confirmaSostituzione(pid, fid, ruolo, outNome, naz, inNome) {
   _finestreAperte[`${pid}_${fid}`] = false;
   saveState();
   renderAdmin();
-  toast(`✓ ${outNome} → ${inNome} (${ruolo}, F${fid})`);
+  toast(t("toast.sub_confirmed",{out:outNome, in:inNome, ruolo, win:t("ui.window_abbr"), fid}));
   return true;
 }
 
@@ -2868,7 +2879,7 @@ document.addEventListener("click", e => {
     const naz     = outSel.options[outSel.selectedIndex]?.dataset?.naz;
     const inVal   = inSel.value;
     if (inVal === "__nuovo__" || inVal === "") {
-      toast("Seleziona un giocatore IN, oppure usa il box 'Nuovo giocatore'", true); return;
+      toast(t("toast.select_in_player"), true); return;
     }
     confirmaSostituzione(pid, fid, ruolo, outNome, naz, inVal);
   }
@@ -2885,7 +2896,7 @@ document.addEventListener("click", e => {
     const outNome = outSel?.value;
     const naz    = outSel?.options[outSel.selectedIndex]?.dataset?.naz;
     const inNome = wrap.querySelector(".sost-nuovo-nome")?.value?.trim();
-    if (!inNome) { toast("Inserisci il nome del giocatore!", true); return; }
+    if (!inNome) { toast(t("toast.enter_player_name"), true); return; }
     confirmaSostituzione(pid, fid, ruolo, outNome, naz, inNome);
   }
 
@@ -2896,10 +2907,10 @@ document.addEventListener("click", e => {
     const idx  = parseInt(e.target.dataset.idx);
     const type = e.target.dataset.type;
     const uid  = e.target.dataset.uid;
-    if (!confirm("Eliminare questa sostituzione?")) return;
+    if (!confirm(t("confirm.delete_sub"))) return;
     _adminDeleteSost(pid, fid, idx, type, uid).then(() => {
       renderAdmin();
-      toast("Sostituzione eliminata.");
+      toast(t("toast.sub_deleted"));
     });
   }
 
@@ -2913,7 +2924,7 @@ document.addEventListener("click", e => {
     _adminDeleteSost(pid, fid, idx, type, uid).then(() => {
       _finestreAperte[`${pid}_${fid}`] = true;
       renderAdmin();
-      toast("Sostituzione rimossa — modifica e riconferma.");
+      toast(t("toast.sub_removed_edit"));
     });
   }
 });
@@ -2970,10 +2981,10 @@ document.addEventListener("click", e => {
     });
     saveState();
     const res = document.getElementById("giornataResult");
-    if (res) { res.style.color="var(--green)"; res.textContent=`✓ Giornata ${GIORNATE[sel.value]} impostata come corrente!`; }
+    if (res) { res.style.color="var(--green)"; res.textContent=t("toast.matchday_set",{g:GIORNATE[sel.value]}); }
     renderClassifica();
     renderGiornata();
-    toast(`Giornata ${GIORNATE[sel.value]} impostata!`);
+    toast(t("toast.matchday_set",{g:GIORNATE[sel.value]}));
   }
 });
 
@@ -3016,15 +3027,15 @@ function renderSidebar() {
     let html = `<div class="sidebar-profile">
       <div class="sidebar-avatar">${(currentUser.displayName||currentUser.email||"U")[0].toUpperCase()}</div>
       <div class="sidebar-user-info">
-        <div class="sidebar-username">${_escHtml(currentUser.displayName || "Utente")}</div>
+        <div class="sidebar-username">${_escHtml(currentUser.displayName || t("lobby.user"))}</div>
         <div class="sidebar-email">${_escHtml(currentUser.email)}</div>
       </div>
     </div>
     <hr class="sidebar-divider">
-    <div class="sidebar-leghe-title">Le tue Leghe</div>
-    <div id="sidebarLegheList"><div class="sidebar-loading">⏳ Caricamento...</div></div>
+    <div class="sidebar-leghe-title">${t("lobby.your_leagues_plain")}</div>
+    <div id="sidebarLegheList"><div class="sidebar-loading">⏳ ${t("ui.loading")}</div></div>
     <hr class="sidebar-divider">
-    <button class="sidebar-btn sidebar-btn-danger" id="btnSidebarSignOut">⏏ Esci dall'account</button>`;
+    <button class="sidebar-btn sidebar-btn-danger" id="btnSidebarSignOut">${t("lobby.sign_out_account_ic")}</button>`;
     content.innerHTML = html;
 
     document.getElementById("btnSidebarSignOut")?.addEventListener("click", async () => {
@@ -3039,7 +3050,7 @@ function renderSidebar() {
         const list = document.getElementById("sidebarLegheList");
         if (!list) return;
         if (!userLeghe.length) {
-          list.innerHTML = '<div class="sidebar-no-leghe">Nessuna lega ancora.<br>Creane una dalla home.</div>';
+          list.innerHTML = `<div class="sidebar-no-leghe">${t("lobby.no_leagues_yet")}</div>`;
           return;
         }
         list.innerHTML = userLeghe.map(([id, l]) => `
@@ -3060,8 +3071,8 @@ function renderSidebar() {
         <button class="auth-tab" data-tab="register">${t("sidebar.tab_register")}</button>
       </div>
       <div id="sidebarAuthLogin" class="auth-form">
-        <div class="field-group"><label>Email</label><input type="email" id="sidebarEmail" placeholder="tua@email.com" autocomplete="email"></div>
-        <div class="field-group"><label>Password</label><input type="password" id="sidebarPwd" placeholder="Password" autocomplete="current-password"></div>
+        <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="sidebarEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
+        <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="sidebarPwd" placeholder="${t("ui.ph_password")}" autocomplete="current-password"></div>
         <button class="btn-primary" id="btnSidebarLogin" style="width:100%">${t("sidebar.btn_login")}</button>
         <p class="pwd-error" id="sidebarLoginErr"></p>
         <p style="text-align:center;margin-top:8px">
@@ -3070,7 +3081,7 @@ function renderSidebar() {
       </div>
       <div id="sidebarAuthReset" class="auth-form" style="display:none">
         <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5">${t("sidebar.reset_desc")}</p>
-        <div class="field-group"><label>Email</label><input type="email" id="sidebarResetEmail" placeholder="tua@email.com" autocomplete="email"></div>
+        <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="sidebarResetEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
         <button class="btn-primary" id="btnSidebarReset" style="width:100%">${t("sidebar.reset_btn")}</button>
         <p class="pwd-error" id="sidebarResetErr"></p>
         <p style="text-align:center;margin-top:8px">
@@ -3078,10 +3089,10 @@ function renderSidebar() {
         </p>
       </div>
       <div id="sidebarAuthRegister" class="auth-form" style="display:none">
-        <div class="field-group"><label>Nome e Cognome</label><input type="text" id="sidebarNome" placeholder="Es. Mario Rossi" autocomplete="name"></div>
-        <div class="field-group"><label>Email</label><input type="email" id="sidebarRegEmail" placeholder="tua@email.com" autocomplete="email"></div>
-        <div class="field-group"><label>Password</label><input type="password" id="sidebarRegPwd" placeholder="Min 6 caratteri" autocomplete="new-password"></div>
-        <button class="btn-primary" id="btnSidebarRegister" style="width:100%">Crea account</button>
+        <div class="field-group"><label>${t("ui.name_surname")}</label><input type="text" id="sidebarNome" placeholder="${t("ui.ph_name")}" autocomplete="name"></div>
+        <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="sidebarRegEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
+        <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="sidebarRegPwd" placeholder="${t("ui.ph_min6")}" autocomplete="new-password"></div>
+        <button class="btn-primary" id="btnSidebarRegister" style="width:100%">${t("ui.create_account")}</button>
         <p class="pwd-error" id="sidebarRegErr"></p>
       </div>`;
 
@@ -3111,7 +3122,7 @@ function renderSidebar() {
       const email = document.getElementById("sidebarResetEmail").value.trim();
       const err = document.getElementById("sidebarResetErr");
       const btn = document.getElementById("btnSidebarReset");
-      if (!email) { err.textContent = "Inserisci la tua email."; err.style.color="var(--red)"; return; }
+      if (!email) { err.textContent = t("ui.enter_your_email"); err.style.color="var(--red)"; return; }
       btn.textContent = "⏳..."; btn.disabled = true;
       const res = await resetPassword(email);
       btn.disabled = false;
@@ -3121,7 +3132,7 @@ function renderSidebar() {
       } else {
         err.style.color = "var(--green)";
         err.textContent = t("sidebar.reset_sent");
-        btn.textContent = "✓ Inviata";
+        btn.textContent = t("ui.sent");
       }
     });
 
@@ -3129,7 +3140,7 @@ function renderSidebar() {
       const email = document.getElementById("sidebarEmail").value.trim();
       const pwd = document.getElementById("sidebarPwd").value;
       const err = document.getElementById("sidebarLoginErr");
-      if (!email||!pwd) { err.textContent="Compila tutti i campi!"; return; }
+      if (!email||!pwd) { err.textContent=t("toast.fill_all_fields"); return; }
       document.getElementById("btnSidebarLogin").textContent="⏳...";
       const res = await signIn(email, pwd);
       if (res.error) { err.textContent=res.error; document.getElementById("btnSidebarLogin").textContent=t("sidebar.btn_login"); return; }
@@ -3144,10 +3155,10 @@ function renderSidebar() {
       const email = document.getElementById("sidebarRegEmail").value.trim();
       const pwd = document.getElementById("sidebarRegPwd").value;
       const err = document.getElementById("sidebarRegErr");
-      if (!nome||!email||!pwd) { err.textContent="Compila tutti i campi!"; return; }
+      if (!nome||!email||!pwd) { err.textContent=t("toast.fill_all_fields"); return; }
       document.getElementById("btnSidebarRegister").textContent="⏳...";
       const res = await signUp(email, pwd, nome);
-      if (res.error) { err.textContent=res.error; document.getElementById("btnSidebarRegister").textContent="Crea account"; }
+      if (res.error) { err.textContent=res.error; document.getElementById("btnSidebarRegister").textContent=t("ui.create_account"); }
     });
   }
 }
@@ -3189,15 +3200,15 @@ function renderHomeJoinForm() {
     const c = document.getElementById("sidebarContent");
     if (!c) return;
     c.innerHTML = `
-      <div class="sidebar-auth-header">🔗 Unisciti a una Lega</div>
-      <div class="sidebar-auth-header" style="font-size:13px;font-weight:500;margin-bottom:6px;">🌍 Leghe Pubbliche</div>
-      <div id="joinLegheList"><p style="color:var(--text2);font-size:13px;">Caricamento...</p></div>
+      <div class="sidebar-auth-header">${t("sidebar.join_league")}</div>
+      <div class="sidebar-auth-header" style="font-size:13px;font-weight:500;margin-bottom:6px;">${t("lobby.public_leagues")}</div>
+      <div id="joinLegheList"><p style="color:var(--text2);font-size:13px;">${t("ui.loading")}</p></div>
       <hr class="sidebar-divider">
-      <div class="sidebar-auth-header" style="font-size:13px;font-weight:500;margin-bottom:6px;">🔒 Entra con Codice</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Inserisci il codice lega (es. AB3K7M) o il codice scelto dall'admin.</p>
+      <div class="sidebar-auth-header" style="font-size:13px;font-weight:500;margin-bottom:6px;">${t("lobby.join_with_code")}</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">${t("lobby.code_hint")}</p>
       <div class="lobby-form" style="flex-direction:column">
-        <input type="text" id="joinCodiceInput" placeholder="Codice lega..." maxlength="10" style="text-transform:uppercase;width:100%">
-        <button class="btn-primary" id="btnJoinCodice" style="width:100%">Entra →</button>
+        <input type="text" id="joinCodiceInput" placeholder="${t("ui.ph_code_short")}" maxlength="10" style="text-transform:uppercase;width:100%">
+        <button class="btn-primary" id="btnJoinCodice" style="width:100%">${t("ui.enter_arrow")}</button>
         <p class="pwd-error" id="joinEntraErr"></p>
       </div>`;
 
@@ -3208,12 +3219,12 @@ function renderHomeJoinForm() {
       if (!listEl) return;
       const pubbliche = Object.entries(idx).filter(([,l]) => l.pubblica);
       if (!pubbliche.length) {
-        listEl.innerHTML = '<p style="color:var(--text2);font-size:13px;">Nessuna lega pubblica disponibile.</p>';
+        listEl.innerHTML = `<p style="color:var(--text2);font-size:13px;">${t("lobby.no_public_leagues")}</p>`;
       } else {
         listEl.innerHTML = pubbliche.map(([id, l]) => {
           return `<div class="lega-card" style="margin-bottom:8px">
             <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
-            <button class="btn-primary lega-join-btn" style="margin-top:6px;width:100%" data-id="${id}">Entra →</button>
+            <button class="btn-primary lega-join-btn" style="margin-top:6px;width:100%" data-id="${id}">${t("ui.enter_arrow")}</button>
           </div>`;
         }).join('');
         listEl.querySelectorAll('.lega-join-btn').forEach(btn => {
@@ -3226,11 +3237,11 @@ function renderHomeJoinForm() {
     document.getElementById("btnJoinCodice")?.addEventListener("click", () => {
       const codice = document.getElementById("joinCodiceInput")?.value.trim().toUpperCase();
       const errEl = document.getElementById("joinEntraErr");
-      if (!codice) { errEl.textContent = "Inserisci un codice!"; return; }
-      errEl.textContent = "⏳ Ricerca...";
+      if (!codice) { errEl.textContent = t("ui.enter_code"); return; }
+      errEl.textContent = t("ui.searching");
       _resolveCodice(codice).then(id => {
         if (id) joinLegaById(id, closeSidebar);
-        else errEl.textContent = "❌ Codice non trovato.";
+        else errEl.textContent = t("ui.code_not_found");
       });
     });
   }, 50);
@@ -3246,21 +3257,21 @@ function renderHomeCreateForm() {
     const c = document.getElementById("sidebarContent");
     if (!c) return;
     c.innerHTML = `
-      <div class="sidebar-auth-header">➕ Crea Nuova Lega</div>
+      <div class="sidebar-auth-header">${t("lobby.create_new_league")}</div>
       <div class="auth-form">
-        <div class="field-group"><label>Nome lega</label><input type="text" id="sbLegaNome" placeholder="Es. Lega degli Amici"></div>
-        <div class="field-group"><label>Tipo</label>
-          <select id="sbLegaTipo"><option value="pubblica">🌍 Pubblica</option><option value="privata">🔒 Privata</option></select>
+        <div class="field-group"><label>${t("ui.league_name")}</label><input type="text" id="sbLegaNome" placeholder="${t("ui.ph_league_name")}"></div>
+        <div class="field-group"><label>${t("ui.type")}</label>
+          <select id="sbLegaTipo"><option value="pubblica">${t("ui.public")}</option><option value="privata">${t("ui.private")}</option></select>
         </div>
-        <div class="field-group" id="sbCodiceGroup" style="display:none"><label>Codice accesso</label><input type="text" id="sbLegaCodice" placeholder="Es. AMICI1" maxlength="10"></div>
-        <button class="btn-primary" id="btnSbCrea" style="width:100%">🏆 Crea Lega</button>
+        <div class="field-group" id="sbCodiceGroup" style="display:none"><label>${t("ui.access_code")}</label><input type="text" id="sbLegaCodice" placeholder="${t("ui.ph_code")}" maxlength="10"></div>
+        <button class="btn-primary" id="btnSbCrea" style="width:100%">${t("lobby.create_league_btn")}</button>
         <p class="parse-result" id="sbCreaResult"></p>
       </div>
       <hr class="sidebar-divider">
-      <div class="sidebar-auth-header">🔒 Entra in una Lega Privata</div>
+      <div class="sidebar-auth-header">${t("lobby.join_private_league")}</div>
       <div class="lobby-form" style="flex-direction:column">
-        <input type="text" id="sbCodiceInput" placeholder="Codice lega (es. ABC123)" maxlength="10" style="text-transform:uppercase;width:100%">
-        <button class="btn-primary" id="btnSbEntra" style="width:100%">Entra →</button>
+        <input type="text" id="sbCodiceInput" placeholder="${t("ui.ph_code_league")}" maxlength="10" style="text-transform:uppercase;width:100%">
+        <button class="btn-primary" id="btnSbEntra" style="width:100%">${t("ui.enter_arrow")}</button>
         <p class="pwd-error" id="sbEntraErr"></p>
       </div>`;
 
@@ -3273,22 +3284,22 @@ function renderHomeCreateForm() {
       const tipo = document.getElementById("sbLegaTipo").value;
       const codice = document.getElementById("sbLegaCodice")?.value.trim().toUpperCase();
       const res = document.getElementById("sbCreaResult");
-      if (!nome) { res.style.color="var(--red)"; res.textContent="Inserisci il nome!"; return; }
+      if (!nome) { res.style.color="var(--red)"; res.textContent=t("lobby.enter_name_bang"); return; }
       const btn = document.getElementById("btnSbCrea");
       btn.disabled=true; btn.textContent="⏳...";
       const result = await creaLega(nome, tipo==="pubblica", codice);
-      btn.disabled=false; btn.textContent="🏆 Crea Lega";
+      btn.disabled=false; btn.textContent=t("lobby.create_league_btn");
       if (result) {
         const {legaId,meta} = result;
         const link = `${location.origin}${location.pathname}?lega=${legaId}`;
         const waMsg = encodeURIComponent(`🏆 Ho creato la lega "${nome}" su ArenaSerieA per la Serie A 2026/27!\nEntra qui 👉 ${link}`);
         res.style.color="var(--green)";
         res.innerHTML=`
-          <div style="margin-bottom:8px">✓ Lega <strong>${legaId}</strong> creata!</div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Condividi il link con i tuoi amici:</div>
+          <div style="margin-bottom:8px">${t("lobby.league_created",{id:`<strong>${legaId}</strong>`})}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${t("lobby.share_link_hint")}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn-sec" style="font-size:11px;padding:4px 10px"
-              onclick="navigator.clipboard.writeText('${link}').then(()=>toast('📋 Link copiato!'))">📋 Copia link</button>
+              onclick="navigator.clipboard.writeText('${link}').then(()=>toast('${t("toast.link_copied")}'))">${t("lobby.copy_link")}</button>
             <a href="https://wa.me/?text=${waMsg}" target="_blank" rel="noopener"
               style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:11px;padding:4px 10px;cursor:pointer;text-decoration:none;font-weight:600">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.529 5.855L.057 23.882l6.198-1.625A11.935 11.935 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.504-5.186-1.385l-.372-.22-3.679.965.98-3.585-.242-.379A9.943 9.943 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
@@ -3302,11 +3313,11 @@ function renderHomeCreateForm() {
     document.getElementById("btnSbEntra")?.addEventListener("click", () => {
       const codice = document.getElementById("sbCodiceInput").value.trim().toUpperCase();
       const err = document.getElementById("sbEntraErr");
-      if (!codice) { err.textContent="Inserisci un codice!"; return; }
-      err.textContent="⏳ Ricerca...";
+      if (!codice) { err.textContent=t("ui.enter_code"); return; }
+      err.textContent=t("ui.searching");
       _resolveCodice(codice).then(id=>{
         if(id) joinLegaById(id, closeSidebar);
-        else err.textContent="❌ Codice non trovato.";
+        else err.textContent=t("ui.code_not_found");
       });
     });
   }, 60);
@@ -3340,7 +3351,7 @@ function exitLega() {
 // ════════════════════════════════════════════════════════════
 
 async function signUp(email, password, nome) {
-  if (!window._fbAuth) return { error: "Firebase Auth non disponibile" };
+  if (!window._fbAuth) return { error: t("auth.fb_unavailable") };
   try {
     const { createUserWithEmailAndPassword, updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     const cred = await createUserWithEmailAndPassword(window._fbAuth, email, password);
@@ -3353,7 +3364,7 @@ async function signUp(email, password, nome) {
 }
 
 async function signIn(email, password) {
-  if (!window._fbAuth) return { error: "Firebase Auth non disponibile" };
+  if (!window._fbAuth) return { error: t("auth.fb_unavailable") };
   try {
     const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     const cred = await signInWithEmailAndPassword(window._fbAuth, email, password);
@@ -3368,7 +3379,7 @@ async function signOut() {
 }
 
 async function resetPassword(email) {
-  if (!window._fbAuth) return { error: "Firebase Auth non disponibile" };
+  if (!window._fbAuth) return { error: t("auth.fb_unavailable") };
   try {
     const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     await sendPasswordResetEmail(window._fbAuth, email);
@@ -3378,15 +3389,15 @@ async function resetPassword(email) {
 
 function translateAuthError(code) {
   const map = {
-    "auth/email-already-in-use": "Email già registrata.",
-    "auth/invalid-email": "Email non valida.",
-    "auth/weak-password": "Password troppo debole (min 6 caratteri).",
-    "auth/user-not-found": "Utente non trovato.",
-    "auth/wrong-password": "Password errata.",
-    "auth/invalid-credential": "Credenziali non valide.",
-    "auth/too-many-requests": "Troppi tentativi. Riprova più tardi.",
+    "auth/email-already-in-use": t("auth.err_email_in_use"),
+    "auth/invalid-email": t("auth.err_invalid_email"),
+    "auth/weak-password": t("auth.err_weak_password"),
+    "auth/user-not-found": t("auth.err_user_not_found"),
+    "auth/wrong-password": t("auth.err_wrong_password"),
+    "auth/invalid-credential": t("auth.err_invalid_credential"),
+    "auth/too-many-requests": t("auth.err_too_many"),
   };
-  return map[code] || "Errore: " + code;
+  return map[code] || t("auth.err_generic",{code});
 }
 
 async function getUserLeghe(uid) {
@@ -3414,62 +3425,62 @@ function renderSuperadminPage() {
   if (!wrap) return;
   wrap.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div><h1>⚡ Superadmin</h1><p class="subtitle">Controllo globale su tutte le leghe</p></div>
-      <button class="btn-sec" id="btnSuperLogout">🔒 Esci</button>
+      <div><h1>${t("super.title")}</h1><p class="subtitle">${t("super.subtitle")}</p></div>
+      <button class="btn-sec" id="btnSuperLogout">${t("super.logout")}</button>
     </div>
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>📅 Giornata Corrente</h3>
-        <p class="hint">Impostata per tutte le leghe.</p>
-        <div class="field-group"><label>Giornata</label>
+        <h3>${t("super.current_matchday")}</h3>
+        <p class="hint">${t("super.set_all_leagues")}</p>
+        <div class="field-group"><label>${t("ui.matchday")}</label>
           <select id="superGiornata">${giornateOptions()}</select>
         </div>
-        <button class="btn-primary" id="btnSuperSalvaGiornata">💾 Salva</button>
+        <button class="btn-primary" id="btnSuperSalvaGiornata">${t("super.save")}</button>
       </div>
       <div class="admin-card">
-        <h3>🗑 Gestione Dati</h3>
-        <p class="hint">Operazioni irreversibili.</p>
+        <h3>${t("super.data_mgmt")}</h3>
+        <p class="hint">${t("super.irreversible_ops")}</p>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="btn-sec" id="btnDelVoti" style="color:var(--orange);border-color:var(--orange)">🗑 Elimina tutti i voti</button>
-          <button class="btn-sec" id="btnDelLeghe" style="color:var(--red);border-color:var(--red)">⚠️ Elimina TUTTE le leghe</button>
-          <button class="btn-sec" id="btnDelAll" style="color:var(--red);border-color:var(--red);font-weight:800">💥 Reset totale</button>
+          <button class="btn-sec" id="btnDelVoti" style="color:var(--orange);border-color:var(--orange)">${t("super.del_votes")}</button>
+          <button class="btn-sec" id="btnDelLeghe" style="color:var(--red);border-color:var(--red)">${t("super.del_leagues")}</button>
+          <button class="btn-sec" id="btnDelAll" style="color:var(--red);border-color:var(--red);font-weight:800">${t("super.reset_total")}</button>
         </div>
       </div>
       <div class="admin-card" style="grid-column:1/-1">
-        <h3>⚽ Database Giocatori</h3>
-        <p class="hint">Carica un CSV con le colonne <strong>nome</strong>, <strong>squadra</strong>, <strong>ruolo</strong> (in qualsiasi ordine, separatore , o ; o tab). I valori ruolo accettati: <code>P</code> portiere, <code>D</code> difensore, <code>C</code> centrocampista, <code>A</code> attaccante.</p>
+        <h3>${t("super.players_db")}</h3>
+        <p class="hint">${t("super.players_db_hint")}</p>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
           <label class="btn-sec" style="cursor:pointer">
-            📂 Scegli CSV
+            ${t("super.choose_csv")}
             <input type="file" id="superGiocatoriFile" accept=".csv" style="display:none">
           </label>
-          <span id="superGiocatoriFileName" style="font-size:13px;color:var(--text2)">Nessun file selezionato</span>
+          <span id="superGiocatoriFileName" style="font-size:13px;color:var(--text2)">${t("super.no_file")}</span>
         </div>
-        <button class="btn-primary" id="btnSuperCaricaGiocatori" disabled>⬆️ Carica nel Database</button>
-        <button class="btn-sec" id="btnSuperSvuotaGiocatori" style="margin-left:8px;color:var(--red);border-color:var(--red)">🗑 Svuota Database</button>
-        <button class="btn-sec" id="btnSuperFixNazioni" style="margin-left:8px">🔧 Fix nomi nazioni</button>
+        <button class="btn-primary" id="btnSuperCaricaGiocatori" disabled>${t("super.upload_db")}</button>
+        <button class="btn-sec" id="btnSuperSvuotaGiocatori" style="margin-left:8px;color:var(--red);border-color:var(--red)">${t("super.clear_db")}</button>
+        <button class="btn-sec" id="btnSuperFixNazioni" style="margin-left:8px">${t("super.fix_nations")}</button>
         <p class="parse-result" id="superGiocatoriResult" style="margin-top:10px"></p>
         <div id="superGiocatoriPreview" style="margin-top:12px"></div>
       </div>
       <div class="admin-card" style="grid-column:1/-1">
-        <h3>🔴 Partite Live – Voti Sofascore</h3>
-        <p class="hint">Il poller aggiorna i voti automaticamente ogni 5 minuti durante le partite. Qui puoi vedere lo stato e forzare un aggiornamento manuale per singola partita.</p>
+        <h3>${t("super.live_matches")}</h3>
+        <p class="hint">${t("super.live_hint")}</p>
         <div class="field-group" style="margin-bottom:12px">
-          <label>Giornata</label>
+          <label>${t("ui.matchday")}</label>
           <select id="superLiveGiornata">${giornateOptions()}</select>
         </div>
         <div id="superMatchList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:8px"></div>
-        <p class="hint" id="superLiveEmpty" style="display:none">Nessuna partita configurata per questa giornata.</p>
+        <p class="hint" id="superLiveEmpty" style="display:none">${t("super.no_matches")}</p>
       </div>
       <div class="admin-card" style="grid-column:1/-1">
-        <h3>📋 Voti Squadre – Modifica Manuale</h3>
-        <p class="hint">Usa questa sezione per correggere voti o aggiungere bonus/malus. I voti con fonte Sofascore sono indicati con 🔴.</p>
+        <h3>${t("super.votes_manual")}</h3>
+        <p class="hint">${t("super.votes_manual_hint")}</p>
         <div class="voti-controls" style="margin-bottom:16px">
-          <div class="filter-item"><label>Squadra</label><select id="superSelectSquadra"></select></div>
-          <div class="filter-item"><label>Giornata</label>
+          <div class="filter-item"><label>${t("voti.squadra")}</label><select id="superSelectSquadra"></select></div>
+          <div class="filter-item"><label>${t("ui.matchday")}</label>
             <select id="superSelectGiornata">${giornateOptions()}</select>
           </div>
-          <button class="btn-primary" id="superBtnSalvaVoti">💾 Salva</button>
+          <button class="btn-primary" id="superBtnSalvaVoti">${t("super.save")}</button>
         </div>
         <div id="superVotiTable" class="voti-table-wrap"></div>
       </div>
@@ -3478,29 +3489,29 @@ function renderSuperadminPage() {
   document.getElementById("superGiornata").value = globalState.giornataCorrente || "1";
   document.getElementById("btnSuperSalvaGiornata")?.addEventListener("click", () => {
     globalState.giornataCorrente = document.getElementById("superGiornata").value;
-    saveGlobalState(); toast("Giornata aggiornata!");
+    saveGlobalState(); toast(t("toast.matchday_updated"));
   });
   document.getElementById("btnSuperLogout")?.addEventListener("click", () => {
     superadminUnlocked = false; adminUnlocked = false;
     ["adminLockIcon","adminLockIconMobile"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="🔒";});
-    navigate("home"); toast("Sessione superadmin terminata.");
+    navigate("home"); toast(t("toast.super_session_ended"));
   });
   document.getElementById("btnDelVoti")?.addEventListener("click", () => {
-    if (!confirm("Eliminare TUTTI i voti?")) return;
-    globalState.voti = {}; saveGlobalState(); toast("Voti eliminati.");
+    if (!confirm(t("confirm.delete_all_votes"))) return;
+    globalState.voti = {}; saveGlobalState(); toast(t("toast.votes_deleted"));
   });
   document.getElementById("btnDelLeghe")?.addEventListener("click", async () => {
-    if (!confirm("Eliminare TUTTE le leghe?")) return;
+    if (!confirm(t("confirm.delete_all_leagues"))) return;
     if (!window._fbReady || !window._db) return;
     await window._set(window._ref(window._db, "leghe"), null);
     await window._set(window._ref(window._db, "indice"), null);
     Object.keys(localStorage).filter(k => k.startsWith("ucl_lega_")).forEach(k => localStorage.removeItem(k));
     localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
-    toast("Leghe eliminate."); renderSuperadminPage();
+    toast(t("toast.leagues_deleted")); renderSuperadminPage();
   });
   document.getElementById("btnDelAll")?.addEventListener("click", async () => {
-    if (!confirm("RESET TOTALE?")) return;
-    if (!confirm("Sicuro sicuro?")) return;
+    if (!confirm(t("confirm.reset_total"))) return;
+    if (!confirm(t("confirm.sure_sure"))) return;
     await window._set(window._ref(window._db, "leghe"), null);
     await window._set(window._ref(window._db, "indice"), null);
     await window._set(window._ref(window._db, "global"), null);
@@ -3508,7 +3519,7 @@ function renderSuperadminPage() {
   });
 
   const sel = document.getElementById("superSelectSquadra");
-  let opts = '<option value="">– Seleziona –</option>';
+  let opts = `<option value="">${t("ui.select_placeholder")}</option>`;
   const squadreList = typeof SQUADRE !== "undefined" ? SQUADRE : [];
   for (const n of squadreList) opts += `<option value="${n}">${n}</option>`;
   sel.innerHTML = opts;
@@ -3539,7 +3550,7 @@ function renderSuperadminPage() {
       const btnCarica = document.getElementById("btnSuperCaricaGiocatori");
       if (!result) {
         resEl.style.color = "var(--red)";
-        resEl.textContent = "❌ Formato non riconosciuto. Serve header con 'nome', 'squadra', 'ruolo'.";
+        resEl.textContent = t("super.format_not_recognized");
         previewEl.innerHTML = "";
         btnCarica.disabled = true;
         _giocatoriParsed = null;
@@ -3549,11 +3560,11 @@ function renderSuperadminPage() {
       const nSquadre = Object.keys(result.db).length;
       const nGioc = result.totale;
       resEl.style.color = "var(--green)";
-      resEl.textContent = `✓ ${nGioc} giocatori in ${nSquadre} squadre – pronti per il caricamento.`;
+      resEl.textContent = t("super.players_ready",{n:nGioc, teams:nSquadre});
       btnCarica.disabled = false;
       // Mostra anteprima
       previewEl.innerHTML = `<details style="margin-top:8px">
-        <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Mostra anteprima (prime 5 squadre)</summary>
+        <summary style="cursor:pointer;font-size:13px;color:var(--text2)">${t("super.show_preview")}</summary>
         <div style="font-size:12px;margin-top:8px;max-height:260px;overflow:auto">
           ${Object.entries(result.db).slice(0,5).map(([sq,gioc]) =>
             `<strong>${sq}</strong>: ${gioc.map(g=>`${_escHtml(g.nome)} (${g.ruolo})`).join(', ')}`
@@ -3568,33 +3579,33 @@ function renderSuperadminPage() {
     if (!_giocatoriParsed) return;
     const resEl = document.getElementById("superGiocatoriResult");
     const btn = document.getElementById("btnSuperCaricaGiocatori");
-    btn.disabled = true; btn.textContent = "⏳ Caricamento...";
+    btn.disabled = true; btn.textContent = t("super.uploading");
     try {
       globalState.giocatoriSquadra = _giocatoriParsed;
       saveGlobalState();
       resEl.style.color = "var(--green)";
-      resEl.textContent = `✅ Database caricato! ${Object.values(_giocatoriParsed).flat().length} giocatori in ${Object.keys(_giocatoriParsed).length} squadre.`;
-      toast("Database giocatori aggiornato!");
-      btn.textContent = "⬆️ Carica nel Database";
+      resEl.textContent = t("super.db_loaded",{n:Object.values(_giocatoriParsed).flat().length, teams:Object.keys(_giocatoriParsed).length});
+      toast(t("toast.db_players_updated"));
+      btn.textContent = t("super.upload_db");
     } catch(e) {
       resEl.style.color = "var(--red)";
-      resEl.textContent = "❌ Errore: " + e.message;
-      btn.disabled = false; btn.textContent = "⬆️ Carica nel Database";
+      resEl.textContent = t("super.error_colon",{msg:e.message});
+      btn.disabled = false; btn.textContent = t("super.upload_db");
     }
   });
 
   document.getElementById("btnSuperSvuotaGiocatori")?.addEventListener("click", async () => {
-    if (!confirm("Svuotare il database dei giocatori? Questa azione è irreversibile.")) return;
+    if (!confirm(t("confirm.clear_players_db"))) return;
     globalState.giocatoriSquadra = {};
     saveGlobalState();
     const resEl = document.getElementById("superGiocatoriResult");
     resEl.style.color = "var(--orange)";
-    resEl.textContent = "Database giocatori svuotato.";
+    resEl.textContent = t("super.db_cleared");
     document.getElementById("superGiocatoriPreview").innerHTML = "";
-    document.getElementById("superGiocatoriFileName").textContent = "Nessun file selezionato";
+    document.getElementById("superGiocatoriFileName").textContent = t("super.no_file");
     document.getElementById("btnSuperCaricaGiocatori").disabled = true;
     _giocatoriParsed = null;
-    toast("Database giocatori svuotato.");
+    toast(t("toast.db_players_cleared"));
   });
 
   document.getElementById("btnSuperFixNazioni")?.addEventListener("click", async () => {
@@ -3603,15 +3614,15 @@ function renderSuperadminPage() {
     const aliasKeys = Object.keys(NAZIONE_ALIASES).filter(a => gs[a]);
     if (!aliasKeys.length) {
       resEl.style.color = "var(--text2)";
-      resEl.textContent = "✅ Nessun alias da correggere nel database.";
+      resEl.textContent = t("super.nations_none");
       return;
     }
     normalizeGiocatoriSquadra(gs);
     globalState.giocatoriSquadra = gs;
     saveGlobalState();
     resEl.style.color = "var(--green)";
-    resEl.textContent = "✅ Corretti: " + aliasKeys.join(", ") + " → nomi canonici.";
-    toast("Fix nomi nazioni completato!");
+    resEl.textContent = t("super.nations_fixed",{list:aliasKeys.join(", ")});
+    toast(t("toast.fix_nations_done"));
   });
 
   // Mostra stato attuale del database
@@ -3619,7 +3630,7 @@ function renderSuperadminPage() {
   if (nAttuale > 0) {
     const resEl = document.getElementById("superGiocatoriResult");
     resEl.style.color = "var(--text2)";
-    resEl.textContent = `Database attuale: ${nAttuale} giocatori in ${Object.keys(globalState.giocatoriSquadra).length} squadre.`;
+    resEl.textContent = t("super.db_current",{n:nAttuale, teams:Object.keys(globalState.giocatoriSquadra).length});
   }
 }
 
@@ -3667,19 +3678,19 @@ function renderSuperMatchList(gId) {
 
     return `<div class="match-live-card ${st.cls}">
       <div class="match-live-header">
-        <span class="match-live-teams">${m.home} <span style="color:var(--text2)">vs</span> ${m.away}</span>
+        <span class="match-live-teams">${m.home} <span style="color:var(--text2)">${t("super.matches_vs")}</span> ${m.away}</span>
         <span class="match-live-badge">${st.icon} ${st.label}</span>
       </div>
       <div class="match-live-ko">⏱ ${ko}</div>
       <div class="match-live-data">
         ${hasData
-          ? `<span style="color:var(--green);font-size:12px">✓ ${homeCount} voti ${m.home} · ${awayCount} voti ${m.away}</span>`
-          : `<span style="color:var(--text2);font-size:12px">Nessun voto ancora importato</span>`}
+          ? `<span style="color:var(--green);font-size:12px">${t("super.votes_count",{hc:homeCount, home:m.home, ac:awayCount, away:m.away})}</span>`
+          : `<span style="color:var(--text2);font-size:12px">${t("super.no_vote_imported")}</span>`}
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="btn-primary" style="font-size:12px;padding:5px 12px"
           data-import-eid="${m.eventId}" data-import-home="${m.home}" data-import-away="${m.away}" data-import-gid="${gId}">
-          ⬇️ Importa ora
+          ${t("super.import_now")}
         </button>
         <button class="btn-sec" style="font-size:12px;padding:5px 12px"
           data-view-naz="${m.home}" data-view-gid="${gId}">
@@ -3722,7 +3733,7 @@ function renderSuperMatchList(gId) {
 async function importFromSofascore(eventId, home, away, gId, btnEl) {
   const origText = btnEl.textContent;
   btnEl.disabled = true;
-  btnEl.textContent = "⏳ Importo...";
+  btnEl.textContent = t("super.importing");
 
   try {
     const res = await fetch(`.netlify/functions/sofascore-proxy?eventId=${eventId}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`);
@@ -3764,11 +3775,11 @@ async function importFromSofascore(eventId, home, away, gId, btnEl) {
       }
     }
     saveGlobalState();
-    toast(`✓ Importati: ${countHome} voti ${home} · ${countAway} voti ${away}`);
+    toast(t("toast.votes_imported",{hc:countHome, home, ac:countAway, away}));
     renderSuperMatchList(gId);
 
   } catch(err) {
-    toast(`❌ Errore import: ${err.message}`, true);
+    toast(t("toast.import_error",{msg:err.message}), true);
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = origText;
@@ -3779,9 +3790,9 @@ function renderSuperVotiTable() {
   const naz = document.getElementById("superSelectSquadra")?.value;
   const gId = document.getElementById("superSelectGiornata")?.value;
   const wrap = document.getElementById("superVotiTable"); if (!wrap) return;
-  if (!naz) { wrap.innerHTML = '<div class="empty-state"><p>Seleziona una squadra.</p></div>'; return; }
+  if (!naz) { wrap.innerHTML = `<div class="empty-state"><p>${t("voti_ui.select_team_empty")}</p></div>`; return; }
   if (isNazioneEliminata(naz, gId)) {
-    wrap.insertAdjacentHTML("beforebegin", `<div id="superElimBanner" style="background:rgba(239,68,68,.12);border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fca5a5">🚫 <strong>${naz}</strong> è eliminata — i voti sono bloccati per gli admin lega. Qui puoi comunque fare correzioni.</div>`);
+    wrap.insertAdjacentHTML("beforebegin", `<div id="superElimBanner" style="background:rgba(239,68,68,.12);border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fca5a5">${t("super.elim_banner",{naz})}</div>`);
   } else {
     document.getElementById("superElimBanner")?.remove();
   }
@@ -3791,7 +3802,7 @@ function renderSuperVotiTable() {
     const ord = ["P","D","C","A"]; return ord.indexOf(a.ruolo) - ord.indexOf(b.ruolo) || a.nome.localeCompare(b.nome);
   });
   const savedVoti = (globalState.voti[naz] || {})[gId] || {};
-  if (!giocatori.length) { wrap.innerHTML = '<div style="padding:20px;color:var(--text2);text-align:center">Nessun giocatore. Le rose devono essere caricate nelle leghe.</div>'; return; }
+  if (!giocatori.length) { wrap.innerHTML = `<div style="padding:20px;color:var(--text2);text-align:center">${t("super.no_players_load")}</div>`; return; }
   function ensurePath(nome) {
     if (!globalState.voti[naz]) globalState.voti[naz] = {};
     if (!globalState.voti[naz][gId]) globalState.voti[naz][gId] = {};
@@ -3812,7 +3823,7 @@ function renderSuperVotiTable() {
     }).join("");
     return `<tr data-nome="${safeKey(g.nome)}" data-ruolo="${g.ruolo}"><td><span class="ruolo-badge ruolo-${g.ruolo}">${g.ruolo}</span></td><td style="font-weight:600">${fromSofa ? '<span title="Voto Sofascore" style="font-size:10px;margin-right:4px">🔴</span>' : ""}${_escHtml(g.nome)}</td><td class="center"><input type="number" class="inp-v" data-nome="${safeKey(g.nome)}" value="${v}" step="0.5" min="0" max="10" placeholder="–" ${isSV ? "disabled style='opacity:.4'" : ""}><button class="sv-btn${isSV ? " active" : ""}" data-nome="${safeKey(g.nome)}">SV</button></td><td><div class="flags-wrap">${fh}</div></td><td class="center"><span class="totale-voto-cell${tot < 0 ? " totale-voto-neg" : ""}" id="svtot_${safeId(g.nome)}">${isSV ? "SV" : v !== "" ? tot.toFixed(1) : "–"}</span></td><td class="center"><button class="btn-icon" data-svdel="${safeKey(g.nome)}" style="color:var(--orange)">✕</button></td></tr>`;
   }).join("");
-  wrap.innerHTML = `<table class="voti-table"><thead><tr><th>R.</th><th>Giocatore</th><th class="center">Voto</th><th>Bonus/Malus</th><th class="center">Tot</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table class="voti-table"><thead><tr><th>${t("voti_ui.ruolo_abbr")}</th><th>${t("voti_ui.giocatore")}</th><th class="center">${t("voti_ui.voto")}</th><th>${t("voti_ui.bonus_malus")}</th><th class="center">${t("voti_ui.tot")}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   function updTot(row) {
     const nome = row.dataset.nome, ruolo = row.dataset.ruolo;
     const inp = row.querySelector(".inp-v"), svBtn = row.querySelector(".sv-btn");
@@ -3854,16 +3865,16 @@ function renderSuperVotiTable() {
     updTot(this.closest("tr"));
   }));
   wrap.querySelectorAll("[data-svdel]").forEach(btn => btn.addEventListener("click", function() {
-    if (!confirm(`Eliminare voto di ${this.dataset.svdel}?`)) return;
+    if (!confirm(t("confirm.delete_vote",{nome:this.dataset.svdel}))) return;
     if (globalState.voti[naz]?.[gId]?.[this.dataset.svdel]) delete globalState.voti[naz][gId][this.dataset.svdel];
-    saveGlobalState(); renderSuperVotiTable(); toast(`Voto eliminato.`);
+    saveGlobalState(); renderSuperVotiTable(); toast(t("toast.vote_deleted"));
   }));
 }
 
 function saveSuperVoti() {
   const naz = document.getElementById("superSelectSquadra")?.value;
   const gId = document.getElementById("superSelectGiornata")?.value;
-  if (!naz) { toast("Seleziona una squadra!", true); return; }
+  if (!naz) { toast(t("toast.select_team"), true); return; }
   if (!globalState.voti[naz]) globalState.voti[naz] = {};
   if (!globalState.voti[naz][gId]) globalState.voti[naz][gId] = {};
   document.querySelectorAll("#superVotiTable tbody tr[data-nome]").forEach(row => {
@@ -3873,7 +3884,7 @@ function saveSuperVoti() {
     if (isSV) globalState.voti[naz][gId][nome] = { sv: true, flags: cur.flags || {} };
     else if (!isNaN(v)) globalState.voti[naz][gId][nome] = { v, sv: false, flags: cur.flags || {} };
   });
-  saveGlobalState(); toast(`✓ Voti salvati – ${naz}, ${GIORNATE[gId]}`);
+  saveGlobalState(); toast(t("toast.votes_saved",{naz, g:GIORNATE[gId]}));
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3901,19 +3912,19 @@ const LEGA_BLACKLIST = [
 ];
 
 function validaNomeLega(nome) {
-  if (!nome || nome.trim().length === 0) return "Inserisci il nome della lega!";
+  if (!nome || nome.trim().length === 0) return t("lobby.name_empty");
   const n = nome.trim();
-  if (n.length < 3) return "Il nome deve avere almeno 3 caratteri.";
-  if (n.length > 40) return "Il nome non può superare 40 caratteri.";
+  if (n.length < 3) return t("lobby.name_min");
+  if (n.length > 40) return t("lobby.name_max");
   // Solo lettere (incluse accentate), numeri, spazi e pochi caratteri speciali
   if (!/^[a-zA-ZàáâãäåæçèéêëìíîïðñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ0-9 _\-\.!']+$/.test(n)) {
-    return "Il nome contiene caratteri non ammessi. Usa solo lettere, numeri e _ - . ! '";
+    return t("lobby.name_chars");
   }
   // Blacklist parole vietate
   const lower = n.toLowerCase().replace(/[^a-z0-9 ]/g, '');
   for (const parola of LEGA_BLACKLIST) {
     if (lower.includes(parola.replace(/[^a-z0-9]/g, ''))) {
-      return "Il nome contiene parole non consentite. Scegli un nome diverso.";
+      return t("lobby.name_blacklist");
     }
   }
   return null; // OK
@@ -3944,9 +3955,9 @@ async function _resolveCodice(codice){
 // Entra in una lega dato l'id: valida via meta (pubblico), poi entraInLega (che crea la membership).
 async function joinLegaById(id, closeFn){
   if(!id) return;
-  if(!currentUser){ toast("Accedi per entrare in una lega.", true); return; }
+  if(!currentUser){ toast(t("toast.login_to_join"), true); return; }
   const meta = await _fetchLegaMeta(id);
-  if(!meta){ toast("Lega non trovata!", true); return; }
+  if(!meta){ toast(t("toast.league_not_found"), true); return; }
   if(typeof closeFn==="function") closeFn();
   await entraInLega(id, meta);
 }
@@ -3967,7 +3978,7 @@ async function _aliveUserLeghe(obj){
 async function creaLega(nome, pubblica, codice) {
   const erroreNome = validaNomeLega(nome);
   if (erroreNome) { toast(erroreNome, true); return null; }
-  if (!window._fbReady || !window._db) { toast("Firebase non connesso!", true); return null; }
+  if (!window._fbReady || !window._db) { toast(t("toast.firebase_not_connected"), true); return null; }
   const legaId = generateLegaId();
   const uid = currentUser?.uid || null;
   const meta = { nome, pubblica, createdAt: Date.now(), adminUid: uid,
@@ -3982,7 +3993,7 @@ async function creaLega(nome, pubblica, codice) {
     });
     if (uid) await addLegaToUser(uid, legaId, nome);
     return { legaId, meta };
-  } catch(e) { toast("Errore: " + e.message, true); return null; }
+  } catch(e) { toast(t("toast.error_generic",{msg:e.message}), true); return null; }
 }
 
 function isCreatoreCorrente() {
@@ -4060,7 +4071,7 @@ function showLobby() {
 
 function renderLobby() {
   const wrap = document.getElementById("lobbyWrap"); if (!wrap) return;
-  wrap.innerHTML = '<div class="lobby-loading">⏳ Caricamento...</div>';
+  wrap.innerHTML = `<div class="lobby-loading">⏳ ${t("ui.loading")}</div>`;
 
   function buildLobby(leghe) {
     const user = currentUser;
@@ -4073,7 +4084,7 @@ function renderLobby() {
       html += `<div class="lobby-section lobby-user-section">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span>👤 <strong>${_escHtml(user.displayName || user.email)}</strong></span>
-          <button class="btn-sec" id="btnSignOut" style="font-size:12px;padding:5px 12px">Esci dall'account</button>
+          <button class="btn-sec" id="btnSignOut" style="font-size:12px;padding:5px 12px">${t("lobby.sign_out_account")}</button>
         </div>
       </div>`;
 
@@ -4081,13 +4092,13 @@ function renderLobby() {
       const userLegheIds = Object.keys(currentUser._leghe || {});
       const userLeghe = Object.entries(leghe).filter(([id]) => userLegheIds.includes(id));
       if (userLeghe.length) {
-        html += `<div class="lobby-section"><h3>🏆 Le tue Leghe</h3><div class="leghe-grid">`;
+        html += `<div class="lobby-section"><h3>${t("lobby.your_leagues")}</h3><div class="leghe-grid">`;
         html += userLeghe.map(([id, l]) => `
           <div class="lega-card">
             <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
-            <div class="lega-card-badge">${l.pubblica ? "🌍 Pubblica" : "🔒 Privata"}</div>
+            <div class="lega-card-badge">${l.pubblica ? t("ui.public") : t("ui.private")}</div>
             ${l.adminUid === user.uid ? '<div style="font-size:10px;color:var(--accent);font-weight:700">👑 Admin</div>' : ''}
-            <button class="btn-primary lega-join-btn" data-id="${id}">Entra →</button>
+            <button class="btn-primary lega-join-btn" data-id="${id}">${t("ui.enter_arrow")}</button>
           </div>`).join('');
         html += '</div></div>';
       }
@@ -4095,20 +4106,20 @@ function renderLobby() {
       // Auth forms — shown when not logged in
       html += `<div class="lobby-section lobby-auth-section">
         <div class="auth-tabs">
-          <button class="auth-tab active" data-tab="login">Accedi</button>
-          <button class="auth-tab" data-tab="register">Registrati</button>
+          <button class="auth-tab active" data-tab="login">${t("sidebar.tab_login")}</button>
+          <button class="auth-tab" data-tab="register">${t("sidebar.tab_register")}</button>
         </div>
         <div id="authTabLogin" class="auth-form">
-          <div class="field-group"><label>Email</label><input type="email" id="loginEmail" placeholder="tua@email.com" autocomplete="email"></div>
-          <div class="field-group"><label>Password</label><input type="password" id="loginPwd" placeholder="Password" autocomplete="current-password"></div>
-          <button class="btn-primary" id="btnLogin" style="width:100%">Accedi</button>
+          <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="loginEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
+          <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="loginPwd" placeholder="${t("ui.ph_password")}" autocomplete="current-password"></div>
+          <button class="btn-primary" id="btnLogin" style="width:100%">${t("sidebar.btn_login")}</button>
           <p class="pwd-error" id="loginError"></p>
         </div>
         <div id="authTabRegister" class="auth-form" style="display:none">
-          <div class="field-group"><label>Nome e Cognome</label><input type="text" id="regNome" placeholder="Es. Mario Rossi" autocomplete="name"></div>
-          <div class="field-group"><label>Email</label><input type="email" id="regEmail" placeholder="tua@email.com" autocomplete="email"></div>
-          <div class="field-group"><label>Password</label><input type="password" id="regPwd" placeholder="Min 6 caratteri" autocomplete="new-password"></div>
-          <button class="btn-primary" id="btnRegister" style="width:100%">Crea account</button>
+          <div class="field-group"><label>${t("ui.name_surname")}</label><input type="text" id="regNome" placeholder="${t("ui.ph_name")}" autocomplete="name"></div>
+          <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="regEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
+          <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="regPwd" placeholder="${t("ui.ph_min6")}" autocomplete="new-password"></div>
+          <button class="btn-primary" id="btnRegister" style="width:100%">${t("ui.create_account")}</button>
           <p class="pwd-error" id="regError"></p>
         </div>
       </div>`;
@@ -4116,11 +4127,11 @@ function renderLobby() {
 
     // ── Superadmin access ──
     html += `<div class="lobby-section lobby-super-section">
-      <button class="btn-sec lobby-super-btn" id="btnSuperToggle">⚡ Accesso Superadmin</button>
+      <button class="btn-sec lobby-super-btn" id="btnSuperToggle">${t("lobby.superadmin_access")}</button>
       <div id="superLoginForm" style="display:none;margin-top:12px">
         <div class="lobby-form">
-          <input type="password" id="superPwdInput" placeholder="Password superadmin..." style="flex:1">
-          <button class="btn-primary" id="btnSuperSubmit">Accedi</button>
+          <input type="password" id="superPwdInput" placeholder="${t("modal.superadmin_placeholder")}" style="flex:1">
+          <button class="btn-primary" id="btnSuperSubmit">${t("modal.superadmin_btn")}</button>
         </div>
         <p class="pwd-error" id="superPwdError"></p>
       </div>
@@ -4129,40 +4140,40 @@ function renderLobby() {
     // ── Public leagues, join private, create — only when logged in ──
     if (user) {
       if (pubbliche.length) {
-        html += `<div class="lobby-section"><h3>🌍 Leghe Pubbliche</h3><div class="leghe-grid">`;
+        html += `<div class="lobby-section"><h3>${t("lobby.public_leagues")}</h3><div class="leghe-grid">`;
         html += pubbliche.map(([id, l]) => `
           <div class="lega-card">
             <div class="lega-card-name">${_escHtml(l.nome || id)}</div>
-            <div class="lega-card-badge">🌍 Pubblica</div>
-            <button class="btn-primary lega-join-btn" data-id="${id}">Entra →</button>
+            <div class="lega-card-badge">${t("ui.public")}</div>
+            <button class="btn-primary lega-join-btn" data-id="${id}">${t("ui.enter_arrow")}</button>
           </div>`).join('');
         html += '</div></div>';
       }
 
       html += `<div class="lobby-section">
-        <h3>🔒 Entra in una Lega Privata</h3>
+        <h3>${t("lobby.join_private_league")}</h3>
         <div class="lobby-form">
-          <input type="text" id="legaCodiceInput" placeholder="Codice lega (es. ABC123)" maxlength="10" style="text-transform:uppercase;flex:1">
-          <button class="btn-primary" id="btnEntraPrivata">Entra →</button>
+          <input type="text" id="legaCodiceInput" placeholder="${t("ui.ph_code_league")}" maxlength="10" style="text-transform:uppercase;flex:1">
+          <button class="btn-primary" id="btnEntraPrivata">${t("ui.enter_arrow")}</button>
         </div>
         <p class="pwd-error" id="legaCodiceError"></p>
       </div>`;
 
       html += `<div class="lobby-section">
-        <h3>➕ Crea una Nuova Lega</h3>
+        <h3>${t("lobby.create_new_league")}</h3>
         <div class="lobby-form-grid">
-          <div class="field-group"><label>Nome lega</label><input type="text" id="newLegaNome" placeholder="Es. Lega degli Amici"></div>
-          <div class="field-group"><label>Tipo</label>
-            <select id="newLegaTipo"><option value="pubblica">🌍 Pubblica</option><option value="privata">🔒 Privata</option></select>
+          <div class="field-group"><label>${t("ui.league_name")}</label><input type="text" id="newLegaNome" placeholder="${t("ui.ph_league_name")}"></div>
+          <div class="field-group"><label>${t("ui.type")}</label>
+            <select id="newLegaTipo"><option value="pubblica">${t("ui.public")}</option><option value="privata">${t("ui.private")}</option></select>
           </div>
-          <div class="field-group" id="codiceGroup" style="display:none"><label>Codice accesso</label><input type="text" id="newLegaCodice" placeholder="Es. AMICI1" maxlength="10"></div>
+          <div class="field-group" id="codiceGroup" style="display:none"><label>${t("ui.access_code")}</label><input type="text" id="newLegaCodice" placeholder="${t("ui.ph_code")}" maxlength="10"></div>
         </div>
-        <button class="btn-primary" id="btnCreaLega" style="margin-top:14px">🏆 Crea Lega</button>
+        <button class="btn-primary" id="btnCreaLega" style="margin-top:14px">${t("lobby.create_league_btn")}</button>
         <p class="parse-result" id="creaLegaResult"></p>
       </div>`;
     } else {
       html += `<div class="lobby-section" style="text-align:center;color:var(--text2)">
-        <p style="font-size:14px">👆 Accedi o registrati per creare e unirti alle leghe.</p>
+        <p style="font-size:14px">${t("lobby.private_hint_login")}</p>
       </div>`;
     }
 
@@ -4182,10 +4193,10 @@ function renderLobby() {
       const email = document.getElementById("loginEmail").value.trim();
       const pwd = document.getElementById("loginPwd").value;
       const err = document.getElementById("loginError");
-      if (!email || !pwd) { err.textContent = "Compila tutti i campi!"; return; }
+      if (!email || !pwd) { err.textContent = t("toast.fill_all_fields"); return; }
       document.getElementById("btnLogin").textContent = "⏳...";
       const res = await signIn(email, pwd);
-      document.getElementById("btnLogin").textContent = "Accedi";
+      document.getElementById("btnLogin").textContent = t("sidebar.btn_login");
       if (res.error) { err.textContent = res.error; return; }
       // onAuthStateChanged gestisce render lobby ed eventuale ingresso ultima lega
     });
@@ -4196,10 +4207,10 @@ function renderLobby() {
       const email = document.getElementById("regEmail").value.trim();
       const pwd = document.getElementById("regPwd").value;
       const err = document.getElementById("regError");
-      if (!nome || !email || !pwd) { err.textContent = "Compila tutti i campi!"; return; }
+      if (!nome || !email || !pwd) { err.textContent = t("toast.fill_all_fields"); return; }
       document.getElementById("btnRegister").textContent = "⏳...";
       const res = await signUp(email, pwd, nome);
-      document.getElementById("btnRegister").textContent = "Crea account";
+      document.getElementById("btnRegister").textContent = t("ui.create_account");
       if (res.error) { err.textContent = res.error; }
     });
 
@@ -4225,7 +4236,7 @@ function renderLobby() {
         if(lobby){lobby.classList.remove("active");lobby.style.display="none";}
         // Navigate to superadmin
         navigate("superadmin");
-      } else { document.getElementById("superPwdError").textContent = hash === SUPERADMIN_PWD_HASH ? "Accedi con l'account amministratore." : "❌ Password errata"; }
+      } else { document.getElementById("superPwdError").textContent = hash === SUPERADMIN_PWD_HASH ? t("ui.login_admin_account") : t("ui.wrong_password"); }
     });
     document.getElementById("superPwdInput")?.addEventListener("keydown", e => {
       if (e.key === "Enter") document.getElementById("btnSuperSubmit")?.click();
@@ -4243,11 +4254,11 @@ function renderLobby() {
     document.getElementById("btnEntraPrivata")?.addEventListener("click", () => {
       const codice = document.getElementById("legaCodiceInput").value.trim().toUpperCase();
       const errEl = document.getElementById("legaCodiceError");
-      if (!codice) { errEl.textContent = "Inserisci un codice!"; return; }
-      errEl.textContent = "⏳ Ricerca...";
+      if (!codice) { errEl.textContent = t("ui.enter_code"); return; }
+      errEl.textContent = t("ui.searching");
       _resolveCodice(codice).then(id => {
         if (id) joinLegaById(id);
-        else errEl.textContent = "❌ Codice non trovato.";
+        else errEl.textContent = t("ui.code_not_found");
       });
     });
     document.getElementById("legaCodiceInput")?.addEventListener("keydown", e => {
@@ -4268,15 +4279,15 @@ function renderLobby() {
       const btn = document.getElementById("btnCreaLega");
       btn.disabled = true; btn.textContent = "⏳ Creazione...";
       const result = await creaLega(nome, tipo === "pubblica", codice);
-      btn.disabled = false; btn.textContent = "🏆 Crea Lega";
+      btn.disabled = false; btn.textContent = t("lobby.create_league_btn");
       if (result) {
         const { legaId, meta } = result;
         const link = `${location.origin}${location.pathname}?lega=${legaId}`;
         res.style.color = "var(--green)";
-        res.innerHTML = `✓ Creata! Codice: <strong>${legaId}</strong><br>
+        res.innerHTML = `${t("lobby.league_created_short",{id:`<strong>${legaId}</strong>`})}<br>
           <small><a href="${link}" style="color:var(--accent)">${link}</a>
           <button class="btn-sec" style="font-size:10px;padding:2px 7px;margin-left:6px"
-            onclick="navigator.clipboard.writeText('${link}').then(()=>toast('Copiato!'))">📋</button></small>`;
+            onclick="navigator.clipboard.writeText('${link}').then(()=>toast(t('toast.copied')))">📋</button></small>`;
         setTimeout(() => entraInLega(legaId, meta), 1500);
       }
     });
@@ -4344,7 +4355,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("hamburger").style.display = "flex";
       navigate("superadmin");
     } else {
-      document.getElementById("superModalErr").textContent = hash === SUPERADMIN_PWD_HASH ? "Accedi con l'account amministratore." : "❌ Password errata";
+      document.getElementById("superModalErr").textContent = hash === SUPERADMIN_PWD_HASH ? t("ui.login_admin_account") : t("ui.wrong_password");
     }
   });
   document.getElementById("superModalPwd")?.addEventListener("keydown", e => {
@@ -4447,7 +4458,7 @@ function renderGiocatoriPage() {
   if (isEmpty) {
     document.getElementById("giocatoriTabellone").innerHTML =
       `<div class="gioc-empty"><span class="material-symbols-outlined" style="font-size:48px;color:var(--text2)">sports_soccer</span>
-       <p>Nessun giocatore nel database.<br><span style="font-size:13px;color:var(--text2)">Il superadmin deve caricare il CSV dei giocatori.</span></p></div>`;
+       <p>${t("squadra.db_not_loaded")}<br><span style="font-size:13px;color:var(--text2)">${t("squadra.wait_super")}</span></p></div>`;
     document.getElementById("giocatoriCount").textContent = "";
     return;
   }
@@ -4500,13 +4511,13 @@ function _renderGiocTabellone() {
   }
 
   if (!html) {
-    wrap.innerHTML = `<div class="gioc-empty"><span class="material-symbols-outlined" style="font-size:40px;color:var(--text2)">search_off</span><p>Nessun risultato trovato.</p></div>`;
+    wrap.innerHTML = `<div class="gioc-empty"><span class="material-symbols-outlined" style="font-size:40px;color:var(--text2)">search_off</span><p>${t("common.no_players")}</p></div>`;
   } else {
     wrap.innerHTML = html;
   }
 
   const countEl = document.getElementById("giocatoriCount");
-  if (countEl) countEl.textContent = totalCount > 0 ? `${totalCount} giocator${totalCount===1?"e":"i"}` : "";
+  if (countEl) countEl.textContent = totalCount > 0 ? `${totalCount} ${t("nav.giocatori").toLowerCase()}` : "";
 }
 
 
@@ -4541,7 +4552,7 @@ function renderSquadraPage() {
   if (!currentUser) {
     wrap.innerHTML = `<div class="gioc-empty">
       <span class="material-symbols-outlined" style="font-size:48px;color:var(--text2)">lock</span>
-      <p>Devi essere registrato e in una lega per costruire la tua squadra.</p>
+      <p>${t("squadra.need_login_league")}</p>
     </div>`;
     return;
   }
@@ -4550,8 +4561,8 @@ function renderSquadraPage() {
   if (Object.keys(db).length === 0) {
     wrap.innerHTML = `<div class="gioc-empty">
       <span class="material-symbols-outlined" style="font-size:48px;color:var(--text2)">sports_soccer</span>
-      <p>Il database giocatori non è ancora stato caricato.<br>
-      <span style="font-size:13px;color:var(--text2)">Attendi che il superadmin carichi il CSV dei giocatori.</span></p>
+      <p>${t("squadra.db_not_loaded")}<br>
+      <span style="font-size:13px;color:var(--text2)">${t("squadra.wait_super")}</span></p>
     </div>`;
     return;
   }
@@ -4583,8 +4594,8 @@ function renderSquadraPage() {
   wrap.innerHTML = `
     <div class="squadra-header-row">
       <div>
-        <h1 style="margin:0;font-size:22px"><span class="material-symbols-outlined header-icon">shield</span> La mia Squadra</h1>
-        <p class="subtitle" style="margin:4px 0 0">Scegli un giocatore per ogni squadra · 6P · 15D · 15C · 12A</p>
+        <h1 style="margin:0;font-size:22px"><span class="material-symbols-outlined header-icon">shield</span> ${t("squadra.h1")}</h1>
+        <p class="subtitle" style="margin:4px 0 0">${t("squadra.subtitle")}</p>
       </div>
       <div id="squadraTimerWrap" class="squadra-timer-wrap"></div>
     </div>
@@ -4594,8 +4605,8 @@ function renderSquadraPage() {
       <div class="squadra-save-row">
         ${deadline
           ? ``
-          : `<button class="btn-primary" id="btnSalvaSquadra" disabled>💾 Salva Squadra</button>
-             <button class="btn-sec" id="btnResetBozza">↺ Ripristina salvata</button>
+          : `<button class="btn-primary" id="btnSalvaSquadra" disabled>${t("squadra.save_squad")}</button>
+             <button class="btn-sec" id="btnResetBozza">${t("squadra.restore_saved")}</button>
              <span id="squadraPrivacySlot"></span>`
         }
       </div>
@@ -4614,7 +4625,7 @@ function renderSquadraPage() {
           </div>
           <div class="giocatori-search-wrap" style="margin-bottom:0">
             <span class="material-symbols-outlined" style="color:var(--text2);font-size:18px">search</span>
-            <input type="text" id="squadraSearchInput" placeholder="Cerca..." autocomplete="off" value="${_squadraSearch}">
+            <input type="text" id="squadraSearchInput" placeholder="${t("ui.ph_search")}" autocomplete="off" value="${_squadraSearch}">
           </div>
         </div>
         <div id="squadraPickerList" class="squadra-picker-list"></div>
@@ -4632,8 +4643,8 @@ function renderSquadraPage() {
         <div id="squadraRosaList" class="squadra-rosa-list"></div>
         <div id="squadraCapSection" class="squadra-cap-section" style="display:none">
           <div class="squadra-cap-header">
-            <span>⭐ Capitano</span>
-            <span class="squadra-cap-hint">Solo P/D/C · bonus +2 se voto ≥ 7</span>
+            <span>${t("squadra.captain")}</span>
+            <span class="squadra-cap-hint">${t("squadra.captain_hint")}</span>
           </div>
           <div id="squadraCapList" class="squadra-cap-list"></div>
         </div>
@@ -4658,14 +4669,14 @@ function _renderRosaPrivacyToggle() {
   const hasRosa = mine?.rosa && Object.values(mine.rosa).some(a => Array.isArray(a) && a.length);
   if (!hasRosa) { el.innerHTML = ""; return; }
   const nascosta = !!mine.nascosta;
-  el.innerHTML = `<button class="btn-sec" id="btnToggleNascondi" style="font-size:13px" title="${nascosta ? 'La tua rosa è nascosta agli altri' : 'Nascondi la tua rosa agli altri fino al calcio d\'inizio'}">
-    ${nascosta ? "👁 Visibile" : "🙈 Nascondi"}
+  el.innerHTML = `<button class="btn-sec" id="btnToggleNascondi" style="font-size:13px" title="${nascosta ? t("squadra.visible_title") : t("squadra.hide_title")}">
+    ${nascosta ? t("squadra.visible") : t("squadra.hide")}
   </button>`;
   document.getElementById("btnToggleNascondi")?.addEventListener("click", async () => {
     const btn = document.getElementById("btnToggleNascondi");
     if (btn) btn.disabled = true;
     const ok = await _saveMyPlayerRose({ nascosta: !nascosta });
-    if (ok) { toast(nascosta ? "✅ Rosa ora visibile agli altri" : "🔒 Rosa nascosta agli altri fino all'11 giugno"); }
+    if (ok) { toast(nascosta ? t("toast.rosa_now_visible") : t("toast.rosa_hidden")); }
     else if (btn) btn.disabled = false;
     _renderRosaPrivacyToggle();
   });
@@ -4690,7 +4701,7 @@ function renderSostSelfService() {
 
   const partId = _getMyPartId();
   if (!partId || !currentUser) {
-    wrap.innerHTML = `<p class="hint" style="margin-top:24px">Accedi per gestire le tue sostituzioni.</p>`;
+    wrap.innerHTML = `<p class="hint" style="margin-top:24px">${t("sost.manage_subs_login")}</p>`;
     return;
   }
 
@@ -4711,7 +4722,7 @@ function renderSostSelfService() {
   // Rosa registrata (con sost applicate)
   const rosaHtml = effectiveRosa ? `<div class="my-rosa-section">
     <div class="my-rosa-header">
-      <span class="my-rosa-title">La mia rosa</span>
+      <span class="my-rosa-title">${t("sost.my_squad")}</span>
       ${partNome ? `<span style="font-size:12px;color:var(--text2)">${_escHtml(partNome)}</span>` : ''}
     </div>
     ${['P','D','C','A'].map(r => {
@@ -4730,8 +4741,8 @@ function renderSostSelfService() {
 
   // Header stato
   let headerHtml = `<div class="sost-self-header">
-    <h3 class="sost-self-title">🔄 Le mie Sostituzioni</h3>
-    <span class="sost-self-counter">${sostTotali}/${MAX_SOST_TOTALI} usate · ${rimanenti} rimanenti</span>
+    <h3 class="sost-self-title">${t("sost.my_subs")}</h3>
+    <span class="sost-self-counter">${t("sost.remaining",{used:sostTotali, max:MAX_SOST_TOTALI, rem:rimanenti})}</span>
   </div>`;
 
   // Stato finestra
@@ -4742,7 +4753,7 @@ function renderSostSelfService() {
       ? new Date(f.close).toLocaleString("it-IT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" })
       : "TBD";
     finestraHtml = `<div class="sost-finestra-badge open">
-      ✅ ${f.label} aperta · chiude il ${closeStr}
+      ${t("sost.window_open_closes",{win:`${t("ui.window")} ${finestraId}`, date:closeStr})}
     </div>`;
   } else {
     // Determina prossima finestra
@@ -4751,9 +4762,9 @@ function renderSostSelfService() {
     if (prossima) {
       const [, fp] = prossima;
       const openStr = new Date(fp.open).toLocaleString("it-IT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-      finestraHtml = `<div class="sost-finestra-badge closed">⏳ Finestra chiusa · prossima apertura il ${openStr}</div>`;
+      finestraHtml = `<div class="sost-finestra-badge closed">${t("sost.window_closed_next",{date:openStr})}</div>`;
     } else {
-      finestraHtml = `<div class="sost-finestra-badge closed">⏹ Tutte le finestre di sostituzione sono terminate.</div>`;
+      finestraHtml = `<div class="sost-finestra-badge closed">${t("sost.all_windows_ended")}</div>`;
     }
   }
 
@@ -4766,7 +4777,7 @@ function renderSostSelfService() {
   for (const [fIdStr, sosts] of Object.entries(getSostEffective(partId))) {
     if (!sosts?.length) continue;
     const fId     = Number(fIdStr);
-    const label   = FINESTRE_TIMING[fId]?.label || `Finestra ${fId}`;
+    const label   = `${t("ui.window")} ${fId}`;
     const isAdmin = (Array.isArray(adminSost[fId]) && adminSost[fId].length > 0);
     const canEdit = !isAdmin && fId === finestraId;
     historyHtml += `<div class="sost-history-group">
@@ -4777,7 +4788,7 @@ function renderSostSelfService() {
           <span class="sost-out">${_ruoloIcon(s.ruolo)} ${_escHtml(s.outNome)} <span class="sost-naz">${s.outNazione}</span></span>
           <span class="sost-arrow">→</span>
           <span class="sost-in">${_ruoloIcon(s.ruolo)} ${_escHtml(s.inNome)} <span class="sost-naz">${s.inNazione}</span></span>
-          ${canEdit ? `<button class="sost-edit-btn" data-fid="${fId}" data-idx="${idx}" title="Modifica">✏️</button><button class="sost-delete-btn" data-fid="${fId}" data-idx="${idx}" title="Elimina">🗑️</button>` : ''}
+          ${canEdit ? `<button class="sost-edit-btn" data-fid="${fId}" data-idx="${idx}" title="${t("ui.edit")}">✏️</button><button class="sost-delete-btn" data-fid="${fId}" data-idx="${idx}" title="${t("common.delete")}">🗑️</button>` : ''}
         </div>`;
       }).join('')}
     </div>`;
@@ -4810,34 +4821,34 @@ function renderSostSelfService() {
       .filter(r => !ruoliEsclusi.has(r));
 
     if (ruoliDisponibili.length === 0) {
-      formHtml = `<p class="hint">Hai già usato un cambio per ogni ruolo in questa finestra.</p>`;
+      formHtml = `<p class="hint">${t("sost.no_subs_yet")}</p>`;
     } else {
       const ruoloOpts = ruoliDisponibili.map(r =>
         `<option value="${r}">${_ruoloIcon(r)} ${_ruoloLabel(r)}</option>`
       ).join('');
       const formTitle = editMode
-        ? `✏️ Modifica sostituzione (${FINESTRE_TIMING[finestraId].label})`
-        : `➕ Nuova sostituzione (${FINESTRE_TIMING[finestraId].label})`;
-      const btnLabel = editMode ? '💾 Aggiorna sostituzione' : '💾 Conferma sostituzione';
+        ? t("sost.edit_sub",{win:`${t("ui.window")} ${finestraId}`})
+        : t("sost.new_sub",{win:`${t("ui.window")} ${finestraId}`});
+      const btnLabel = editMode ? t("sost.update_sub") : t("sost.confirm_sub");
 
       formHtml = `
         <div class="sost-form${editMode ? ' sost-form--edit' : ''}" id="sostSelfForm">
           <div class="sost-form-title">${formTitle}</div>
           <div class="sost-form-row">
-            <label>Ruolo</label>
+            <label>${t("sost.role")}</label>
             <select id="sostFormRuolo" class="sost-select">${ruoloOpts}</select>
           </div>
           <div class="sost-form-row">
-            <label>Esci</label>
-            <select id="sostFormOut" class="sost-select"><option value="">– seleziona –</option></select>
+            <label>${t("sost.out")}</label>
+            <select id="sostFormOut" class="sost-select"><option value="">${t("sost.select_ph")}</option></select>
           </div>
           <div class="sost-form-row">
-            <label>Entra</label>
-            <select id="sostFormIn" class="sost-select" disabled><option value="">– seleziona –</option></select>
+            <label>${t("sost.in")}</label>
+            <select id="sostFormIn" class="sost-select" disabled><option value="">${t("sost.select_ph")}</option></select>
           </div>
           <div class="sost-form-btns">
             <button class="btn-primary" id="btnSalvaSost" disabled>${btnLabel}</button>
-            ${editMode ? `<button class="sost-annulla-btn" id="btnAnnullaEditSost">✕ Annulla modifica</button>` : ''}
+            ${editMode ? `<button class="sost-annulla-btn" id="btnAnnullaEditSost">${t("sost.cancel_edit")}</button>` : ''}
           </div>
         </div>`;
     }
@@ -4874,7 +4885,7 @@ function renderSostSelfService() {
     btn.addEventListener("click", async () => {
       const fid = Number(btn.dataset.fid);
       const idx = Number(btn.dataset.idx);
-      if (!confirm("Eliminare questa sostituzione?")) return;
+      if (!confirm(t("confirm.delete_sub"))) return;
       _sostEditMode = null;
       await _deleteSostSelfService(uid, fid, idx);
     });
@@ -4907,7 +4918,7 @@ function _buildInOptions(ruolo, nazione, rosaBase) {
   const lista = candidati
     .filter(g => g.ruolo === ruolo && !inRosa.has(g.nome))
     .map(g => g.nome);
-  if (!lista.length) return `<option value="">Nessun giocatore disponibile</option>`;
+  if (!lista.length) return `<option value="">${t("sost.no_players_available")}</option>`;
   return lista.map(n => `<option value="${n}">${n}</option>`).join('');
 }
 
@@ -4922,8 +4933,8 @@ function _bindSostForm(partId, uid, finestraId, rosaBase) {
   const capitanoNome = part?.capitanoGiocatore || null;
 
   const aggiornaOut = () => {
-    selOut.innerHTML = `<option value="">– seleziona –</option>` + _buildOutOptions(selRuolo.value, rosaBase, capitanoNome);
-    selIn.innerHTML  = `<option value="">– seleziona –</option>`;
+    selOut.innerHTML = `<option value="">${t("sost.select_ph")}</option>` + _buildOutOptions(selRuolo.value, rosaBase, capitanoNome);
+    selIn.innerHTML  = `<option value="">${t("sost.select_ph")}</option>`;
     selIn.disabled   = true;
     btnSalva.disabled = true;
   };
@@ -4931,7 +4942,7 @@ function _bindSostForm(partId, uid, finestraId, rosaBase) {
   const aggiornaIn = () => {
     const [nome, nazione] = (selOut.value || "").split("|");
     if (!nome || !nazione) { selIn.disabled = true; btnSalva.disabled = true; return; }
-    selIn.innerHTML = `<option value="">– seleziona –</option>` + _buildInOptions(selRuolo.value, nazione, rosaBase);
+    selIn.innerHTML = `<option value="">${t("sost.select_ph")}</option>` + _buildInOptions(selRuolo.value, nazione, rosaBase);
     selIn.disabled  = false;
     btnSalva.disabled = true;
   };
@@ -4958,15 +4969,15 @@ function _bindSostForm(partId, uid, finestraId, rosaBase) {
     const ruolo = selRuolo.value;
     const [outNome, outNazione] = (selOut.value || "").split("|");
     const inNome = selIn.value;
-    if (!ruolo || !outNome || !outNazione || !inNome) { toast("Compila tutti i campi!", true); return; }
-    if (capitanoNome && outNome === capitanoNome) { toast("Non puoi sostituire il capitano!", true); return; }
+    if (!ruolo || !outNome || !outNazione || !inNome) { toast(t("toast.fill_all_fields"), true); return; }
+    if (capitanoNome && outNome === capitanoNome) { toast(t("toast.cannot_sub_captain"), true); return; }
     await _saveSostSelfService(uid, finestraId, { outNome, outNazione, ruolo, inNome, inNazione: outNazione });
   });
 }
 
 async function _saveSostSelfService(uid, finestraId, nuovaSost) {
   if (!currentLegaId || !window._db || !window._set || !window._ref) {
-    toast("Errore connessione Firebase", true); return;
+    toast(t("toast.firebase_conn_error"), true); return;
   }
   const existing = (_playerSostState[uid]?.[finestraId]) || [];
   let updated;
@@ -4982,17 +4993,17 @@ async function _saveSostSelfService(uid, finestraId, nuovaSost) {
       window._ref(window._db, `leghe/${currentLegaId}/playerSostituzioni/${uid}/${finestraId}`),
       updated
     );
-    toast("✅ Sostituzione salvata!");
+    toast(t("toast.sub_saved"));
     // _playerSostState verrà aggiornato dal listener Firebase
   } catch(e) {
     console.error("_saveSostSelfService error:", e);
-    toast("Errore salvataggio: " + (e.message || e), true);
+    toast(t("toast.save_error",{msg:(e.message || e)}), true);
   }
 }
 
 async function _deleteSostSelfService(uid, finestraId, idx) {
   if (!currentLegaId || !window._db || !window._set || !window._ref) {
-    toast("Errore connessione Firebase", true); return;
+    toast(t("toast.firebase_conn_error"), true); return;
   }
   const existing = (_playerSostState[uid]?.[finestraId]) || [];
   const updated  = existing.filter((_, i) => i !== idx);
@@ -5001,10 +5012,10 @@ async function _deleteSostSelfService(uid, finestraId, idx) {
       window._ref(window._db, `leghe/${currentLegaId}/playerSostituzioni/${uid}/${finestraId}`),
       updated.length > 0 ? updated : null
     );
-    toast("✅ Sostituzione eliminata!");
+    toast(t("toast.sub_deleted2"));
   } catch(e) {
     console.error("_deleteSostSelfService error:", e);
-    toast("Errore eliminazione: " + (e.message || e), true);
+    toast(t("toast.delete_error",{msg:(e.message || e)}), true);
   }
 }
 
@@ -5097,7 +5108,7 @@ function _renderSquadraPicker() {
   const pieno = cnt >= req;
 
   if (!filtered.length) {
-    listEl.innerHTML = `<div class="gioc-empty" style="padding:30px"><p>Nessun giocatore trovato.</p></div>`;
+    listEl.innerHTML = `<div class="gioc-empty" style="padding:30px"><p>${t("common.no_players")}</p></div>`;
     return;
   }
 
@@ -5110,10 +5121,10 @@ function _renderSquadraPicker() {
     if (nazBlocca) cls += ' blocked';
     if (disabled && !inRosa) cls += ' disabled';
 
-    const tooltip = inRosa ? 'Rimuovi dalla rosa'
-      : nazBlocca ? `Hai già un giocatore di ${g.nazione}`
-      : pieno     ? `Hai già ${req} ${_ruoloLabel(ruolo).toLowerCase()}i`
-      : 'Aggiungi alla rosa';
+    const tooltip = inRosa ? t("squadra.remove_from_squad")
+      : nazBlocca ? t("squadra.already_have_from",{naz:g.nazione})
+      : pieno     ? t("squadra.already_have_n",{n:req, role:_ruoloLabel(ruolo).toLowerCase()})
+      : t("squadra.add_to_squad");
 
     return `<div class="${cls}" title="${tooltip}"
       data-nome="${g.nome.replace(/"/g,'&quot;')}" data-naz="${g.nazione.replace(/"/g,'&quot;')}"
@@ -5135,7 +5146,7 @@ function _renderSquadraRosa() {
   const capAttuale = _squadraBozzaCap;
 
   if (!arr.length) {
-    listEl.innerHTML = `<div class="squadra-rosa-empty">Nessun ${_ruoloLabel(ruolo).toLowerCase()} selezionato</div>`;
+    listEl.innerHTML = `<div class="squadra-rosa-empty">${t("squadra.no_role_selected",{role:_ruoloLabel(ruolo).toLowerCase()})}</div>`;
     return;
   }
 
@@ -5150,9 +5161,9 @@ function _renderSquadraRosa() {
       <span class="squadra-rosa-nome">${_escHtml(g.nome)}</span>
       ${canBeCap ? `<button class="squadra-rosa-cap${isCap ? ' active' : ''}"
         data-cnome="${nomeQ}" data-cnaz="${nazQ}" data-cruolo="${ruolo}"
-        title="${isCap ? 'Rimuovi capitano' : 'Imposta come capitano'}">⭐</button>` : ''}
+        title="${isCap ? t("squadra.remove_captain") : t("squadra.set_captain")}">⭐</button>` : ''}
       <button class="squadra-rosa-remove" data-nome="${nomeQ}"
-        data-naz="${nazQ}" data-ruolo="${ruolo}" title="Rimuovi">✕</button>
+        data-naz="${nazQ}" data-ruolo="${ruolo}" title="${t("squadra.remove")}">✕</button>
     </div>`;
   }).join('');
 }
@@ -5177,11 +5188,11 @@ function _renderSquadraCapitano() {
       <button class="squadra-cap-remove-btn"
         data-cnome="${cap.nome.replace(/"/g,'&quot;')}"
         data-cnaz="${cap.nazione.replace(/"/g,'&quot;')}"
-        title="Rimuovi capitano">✕</button>
+        title="${t("squadra.remove_captain")}">✕</button>
     </div>`;
   } else {
     listEl.innerHTML = `<div class="squadra-cap-summary empty">
-      Nessun capitano · clicca ⭐ su un giocatore (P/D/C)
+      ${t("squadra.no_captain")}
     </div>`;
   }
 }
@@ -5311,17 +5322,17 @@ function _bindSquadraEvents(deadline) {
       }
     }
     _renderSquadraUI();
-    toast("Bozza ripristinata.");
+    toast(t("toast.draft_restored"));
   });
 }
 
 async function _salvaSquadra() {
-  if (isDeadlinePassata()) { toast("Deadline scaduta!", true); return; }
+  if (isDeadlinePassata()) { toast(t("toast.deadline_expired"), true); return; }
   const bozza = _squadraBozza;
   // Valida
   for (const [r, n] of Object.entries(ROSA_REQUISITI)) {
     if ((bozza[r]||[]).length !== n) {
-      toast(`Servono ${n} ${_ruoloLabel(r).toLowerCase()}${n>1?'i':'e'}! (hai ${(bozza[r]||[]).length})`, true);
+      toast(t("toast.need_role_count",{n, ruolo:t("roles."+r+"s").toLowerCase(), have:(bozza[r]||[]).length}), true);
       _squadraFiltroRuolo = r;
       _renderSquadraUI();
       return;
@@ -5333,7 +5344,7 @@ async function _salvaSquadra() {
   for (const [r, arr] of Object.entries(bozza)) {
     for (const g of arr) {
       if (nazViste.has(g.nazione)) {
-        conflitto = `Hai due giocatori di ${g.nazione}: ${nazViste.get(g.nazione)} e ${_escHtml(g.nome)}!`;
+        conflitto = t("toast.two_players_same_club",{naz:g.nazione, a:nazViste.get(g.nazione), b:_escHtml(g.nome)});
         break;
       }
       nazViste.set(g.nazione, g.nome);
@@ -5342,7 +5353,7 @@ async function _salvaSquadra() {
   }
   if (conflitto) { toast(conflitto, true); return; }
 
-  if (!currentUser) { toast("Devi accedere per salvare la squadra.", true); return; }
+  if (!currentUser) { toast(t("toast.login_to_save_team"), true); return; }
 
   // Salva la rosa nel nodo self-service (scrivibile dall'utente stesso).
   // L'admin NON deve fare nulla: il merge mostrerà subito il partecipante.
@@ -5351,13 +5362,13 @@ async function _salvaSquadra() {
     rosa: JSON.parse(JSON.stringify(bozza)),
     capitano: capitanoNome
   });
-  if (!ok) { toast("Errore nel salvataggio. Riprova.", true); return; }
+  if (!ok) { toast(t("toast.save_squad_retry"), true); return; }
 
   renderPage(currentPage());
-  toast("✅ Squadra salvata!");
+  toast(t("toast.team_saved"));
   // Aggiorna bottone salva
   const btn = document.getElementById("btnSalvaSquadra");
-  if (btn) { btn.textContent = "✅ Salvata!"; setTimeout(() => { btn.textContent = "💾 Salva Squadra"; }, 2000); }
+  if (btn) { btn.textContent = t("squadra.saving"); setTimeout(() => { btn.textContent = t("squadra.save_squad"); }, 2000); }
 }
 
 function _startTimer() {
@@ -5383,7 +5394,7 @@ function _startTimer() {
 
     // Nessuna deadline impostata: rose sempre aperte
     if (!deadlineMs) {
-      wrap.innerHTML = `<div class="squadra-timer active">🔓 Iscrizioni aperte</div>`;
+      wrap.innerHTML = `<div class="squadra-timer active">${t("squadra.timer_open")}</div>`;
       return;
     }
 
@@ -5392,7 +5403,7 @@ function _startTimer() {
       const diff   = deadlineMs - now;
       const urgent = diff < 3600000;
       wrap.innerHTML = `<div class="squadra-timer ${urgent ? 'urgent' : ''}">
-        ⏱ Chiusura iscrizioni tra ${fmtDiff(diff)}
+        ${t("squadra.closing_in",{t:fmtDiff(diff)})}
       </div>`;
       return;
     }
@@ -5406,12 +5417,12 @@ function _startTimer() {
       if (now >= openMs && now < closeMs) {
         // Finestra attualmente aperta
         if (closeMs === Infinity) {
-          wrap.innerHTML = `<div class="squadra-timer active">🔓 ${f.label} aperta</div>`;
+          wrap.innerHTML = `<div class="squadra-timer active">${t("squadra.window_open",{win:`${t("ui.window")} ${id}`})}</div>`;
         } else {
           const diff   = closeMs - now;
           const urgent = diff < 3600000;
           wrap.innerHTML = `<div class="squadra-timer active ${urgent ? 'urgent' : ''}">
-            🔓 ${f.label} — chiude tra ${fmtDiff(diff)}
+            ${t("squadra.window_closes_in",{win:`${t("ui.window")} ${id}`, t:fmtDiff(diff)})}
           </div>`;
         }
         return;
@@ -5421,14 +5432,14 @@ function _startTimer() {
         // Prossima finestra non ancora aperta (gap tra finestre)
         const diff = openMs - now;
         wrap.innerHTML = `<div class="squadra-timer upcoming">
-          🔒 ${f.label} apre tra ${fmtDiff(diff)}
+          ${t("squadra.window_opens_in",{win:`${t("ui.window")} ${id}`, t:fmtDiff(diff)})}
         </div>`;
         return;
       }
     }
 
     // Tutte le finestre chiuse
-    wrap.innerHTML = `<div class="squadra-timer expired">🔒 Finestre di cambio chiuse</div>`;
+    wrap.innerHTML = `<div class="squadra-timer expired">${t("squadra.windows_closed")}</div>`;
     clearInterval(_timerInterval);
   }
 

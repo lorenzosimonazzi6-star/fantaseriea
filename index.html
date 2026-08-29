@@ -15,12 +15,12 @@
 
   <!-- SEO -->
   <meta name="description" content="ArenaSerieA: il gioco di fantasy calcio della Serie A 2026/27, completamente gratuito. Rosa da 20 club, lega privata con gli amici, voti live da SofaScore. Gioca subito, senza download né registrazione.">
-  <meta name="keywords" content="ArenaSerieA, fantasy calcio serie a, fantasy serie a 2026, fantasy football serie a, fantasy calcio serie a gratis, lega privata fantasy serie a, rosa serie a fantasy, gioco fantasy serie a, fantasy calcio italiano gratuito">
+  <meta name="keywords" content="ArenaSerieA, fantasy calcio serie a, fantasy serie a 2026, fantasy football serie a, fantasy calcio serie a gratis, lega privata fantasy serie a, rosa serie a fantasy, gioco fantasy serie a, fantasy calcio italiano gratuito, fantasy football serie a, serie a fantasy game, serie a fantasy 2026, free serie a fantasy football, italian football fantasy game, private serie a fantasy league, build your serie a squad">
   <link rel="canonical" href="https://fantaarena.it/seriea/">
 
   <!-- Hreflang IT / EN / default -->
-  <link rel="alternate" hreflang="it" href="https://fantaarena.it/seriea/">
-  <link rel="alternate" hreflang="en" href="https://fantaarena.it/seriea/">
+  <link rel="alternate" hreflang="it" href="https://fantaarena.it/seriea/?lang=it">
+  <link rel="alternate" hreflang="en" href="https://fantaarena.it/seriea/?lang=en">
   <link rel="alternate" hreflang="x-default" href="https://fantaarena.it/seriea/">
 
   <!-- Favicon -->
@@ -217,7 +217,7 @@
       <div class="nav-right">
         <button class="nav-lang-btn" id="langSwitcher" onclick="toggleLang()" title="Switch language">🇬🇧 EN</button>
         <button class="nav-push-btn" id="btnPushToggle" title="Notifiche">🔔</button>
-        <button class="nav-profile-btn" id="btnSidebar" onclick="toggleSidebar()" title="Profilo e Leghe">
+        <button class="nav-profile-btn" id="btnSidebar" onclick="toggleSidebar()" title="Profilo e Leghe" data-i18n-title="nav.profile_title">
           <span id="navProfileIcon" class="material-symbols-outlined">account_circle</span>
         </button>
       </div>
@@ -255,7 +255,7 @@
     <!-- Sidebar drawer -->
     <div id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <span class="sidebar-title">Menu</span>
+        <span class="sidebar-title" data-i18n="sidebar.title">Menu</span>
         <button class="sidebar-close" onclick="closeSidebar()">✕</button>
       </div>
       <div id="sidebarContent" class="sidebar-content">
@@ -267,12 +267,12 @@
     <div id="superadminModal" class="modal-overlay" style="display:none">
       <div class="modal" style="max-width:360px">
         <div class="modal-header">
-          <h3>⚡ Superadmin</h3>
+          <h3 data-i18n="modal.superadmin_title">⚡ Superadmin</h3>
           <button class="modal-close" onclick="document.getElementById('superadminModal').style.display='none'">✕</button>
         </div>
         <div class="modal-body">
-          <div class="field-group"><label>Password</label><input type="password" id="superModalPwd" placeholder="Password superadmin..."></div>
-          <button class="btn-primary" id="btnSuperModalSubmit" style="width:100%;margin-top:8px">Accedi</button>
+          <div class="field-group"><label data-i18n="modal.superadmin_pwd">Password</label><input type="password" id="superModalPwd" placeholder="Password superadmin..." data-i18n-ph="modal.superadmin_placeholder"></div>
+          <button class="btn-primary" id="btnSuperModalSubmit" style="width:100%;margin-top:8px" data-i18n="modal.superadmin_btn">Accedi</button>
           <p class="pwd-error" id="superModalErr"></p>
         </div>
       </div>
@@ -283,7 +283,7 @@
 
     <div id="syncBar" class="sync-bar" style="display:none"></div>
     <div id="swUpdateBar" style="display:none;position:fixed;top:70px;left:0;right:0;z-index:500;background:var(--accent);color:#000;font-size:14px;font-weight:600;text-align:center;padding:10px 16px;box-shadow:0 4px 12px rgba(0,0,0,.4)">
-      🔄 Nuova versione disponibile — <button onclick="window._swUpdate()" style="margin-left:8px;background:#000;color:var(--accent);border:none;border-radius:6px;padding:4px 14px;font-weight:700;cursor:pointer;font-size:13px">Aggiorna ora</button>
+      <span data-i18n="sw.new_version">🔄 Nuova versione disponibile —</span> <button onclick="window._swUpdate()" style="margin-left:8px;background:#000;color:var(--accent);border:none;border-radius:6px;padding:4px 14px;font-weight:700;cursor:pointer;font-size:13px" data-i18n="sw.update_now">Aggiorna ora</button>
     </div>
 
     <main class="main">
@@ -318,7 +318,7 @@
             ai nostri bonus piace cambiare in base al ruolo del giocatore.. e scegli con cura il tuo
             <strong>Capitano</strong>! Potrà rivelarsi l'arma in più per battere i tuoi amici e vincere il torneo.
           </p>
-          <p class="home-intro-text">
+          <p class="home-intro-text" data-i18n="home_extra.intro_p3">
             ArenaSerieA è pensato per gruppi di amici: niente iscrizioni obbligatorie, niente costi nascosti.
             Crei la lega in un minuto, condividi il link e sei pronto. Funziona su qualsiasi dispositivo,
             anche senza connessione grazie alla <strong>Progressive Web App</strong>.
@@ -379,122 +379,122 @@
       <!-- REGOLAMENTO -->
       <section id="page-regolamento" class="page">
         <div class="page-header">
-          <h1><span class="material-symbols-outlined header-icon">menu_book</span> Regolamento</h1>
-          <p class="subtitle">ArenaSerieA · Serie A 2026/27 · regole complete</p>
+          <h1><span class="material-symbols-outlined header-icon">menu_book</span> <span data-i18n="nav.regolamento">Regolamento</span></h1>
+          <p class="subtitle" data-i18n="rules_full.subtitle">ArenaSerieA · Serie A 2026/27 · regole complete</p>
         </div>
 
         <div class="rulebook">
 
           <article class="rulebook-section">
-            <h2><span class="rb-num">1</span> Composizione della rosa</h2>
-            <p>Ogni partecipante seleziona una rosa di <strong>20 giocatori</strong> — <strong>1 per ogni club</strong> partecipante alla Serie A 2026/27.</p>
+            <h2><span class="rb-num">1</span> <span data-i18n="rules_full.s1_title">Composizione della rosa</span></h2>
+            <p data-i18n="rules_full.s1_p1">Ogni partecipante seleziona una rosa di <strong>20 giocatori</strong> — <strong>1 per ogni club</strong> partecipante alla Serie A 2026/27.</p>
             <div class="rb-callout">
               <span class="material-symbols-outlined">flag</span>
               <div>
-                <strong>Vincoli obbligatori</strong>
-                <p>È obbligatorio selezionare <strong>1 giocatore per ogni club</strong> partecipante (20 club, 20 giocatori).<br>
+                <strong data-i18n="rules_full.s1_callout_title">Vincoli obbligatori</strong>
+                <p data-i18n="rules_full.s1_callout_p">È obbligatorio selezionare <strong>1 giocatore per ogni club</strong> partecipante (20 club, 20 giocatori).<br>
                 La rosa va compilata <strong>prima dell'inizio del campionato</strong>. Dopo il fischio d'inizio della prima giornata non sarà più modificabile.</p>
               </div>
             </div>
           </article>
 
           <article class="rulebook-section">
-            <h2><span class="rb-num">2</span> Formazione e voti</h2>
-            <p>Non è necessario inviare una formazione: <strong>tutti i giocatori della rosa vanno automaticamente a voto</strong> in ogni giornata.</p>
-            <p>In caso di <strong>SV (senza voto)</strong> — giocatore che non scende in campo — viene assegnato <strong>punteggio zero</strong>.</p>
+            <h2><span class="rb-num">2</span> <span data-i18n="rules_full.s2_title">Formazione e voti</span></h2>
+            <p data-i18n="rules_full.s2_p1">Non è necessario inviare una formazione: <strong>tutti i giocatori della rosa vanno automaticamente a voto</strong> in ogni giornata.</p>
+            <p data-i18n="rules_full.s2_p2">In caso di <strong>SV (senza voto)</strong> — giocatore che non scende in campo — viene assegnato <strong>punteggio zero</strong>.</p>
             <div class="rb-callout">
               <span class="material-symbols-outlined">verified</span>
               <div>
-                <strong>Fonte ufficiale dei voti</strong>
-                <p>La redazione di riferimento per voti, bonus e malus è <strong>SofaScore</strong>. In caso di discrepanze, fa fede SofaScore.</p>
+                <strong data-i18n="rules_full.s2_callout_title">Fonte ufficiale dei voti</strong>
+                <p data-i18n="rules_full.s2_callout_p">La redazione di riferimento per voti, bonus e malus è <strong>SofaScore</strong>. In caso di discrepanze, fa fede SofaScore.</p>
               </div>
             </div>
           </article>
 
           <article class="rulebook-section">
-            <h2><span class="rb-num">3</span> Sostituzioni</h2>
-            <p>Hai a disposizione <strong>6 finestre di sostituzione</strong> durante la stagione (una ogni 5 giornate), con questi vincoli:</p>
+            <h2><span class="rb-num">3</span> <span data-i18n="rules_full.s3_title">Sostituzioni</span></h2>
+            <p data-i18n="rules_full.s3_p1">Hai a disposizione <strong>6 finestre di sostituzione</strong> durante la stagione (una ogni 5 giornate), con questi vincoli:</p>
             <ul class="rb-list">
-              <li>Al massimo <strong>3 sostituzioni per ruolo</strong> in tutta la stagione</li>
-              <li>Il giocatore entrante deve essere dello <strong>stesso club</strong> di quello uscente</li>
-              <li>Il <strong>Capitano non può essere sostituito</strong></li>
+              <li data-i18n="rules_full.s3_li1">Al massimo <strong>3 sostituzioni per ruolo</strong> in tutta la stagione</li>
+              <li data-i18n="rules_full.s3_li2">Il giocatore entrante deve essere dello <strong>stesso club</strong> di quello uscente</li>
+              <li data-i18n="rules_full.s3_li3">Il <strong>Capitano non può essere sostituito</strong></li>
             </ul>
             <div class="rb-example">
-              <span class="rb-example-label">Esempi</span>
+              <span class="rb-example-label" data-i18n="rules_full.s3_ex_label">Esempi</span>
               <div class="rb-example-rows">
-                <div>Tolgo <strong>Lautaro</strong> <span class="rb-arrow">→</span> Prendo <strong>Thuram</strong> <span class="rb-naz">(Inter)</span></div>
-                <div>Tolgo <strong>Bastoni</strong> <span class="rb-arrow">→</span> Prendo <strong>Bisseck</strong> <span class="rb-naz">(Inter)</span></div>
+                <div data-i18n="rules_full.s3_ex1">Tolgo <strong>Lautaro</strong> <span class="rb-arrow">→</span> Prendo <strong>Thuram</strong> <span class="rb-naz">(Inter)</span></div>
+                <div data-i18n="rules_full.s3_ex2">Tolgo <strong>Bastoni</strong> <span class="rb-arrow">→</span> Prendo <strong>Bisseck</strong> <span class="rb-naz">(Inter)</span></div>
               </div>
             </div>
-            <h3>Finestre temporali</h3>
+            <h3 data-i18n="rules_full.s3_windows_title">Finestre temporali</h3>
             <ul class="rb-list">
-              <li>Una finestra si apre <strong>ogni 5 giornate</strong> — dopo la G5, G10, G15, G20, G25 e G30 (<strong>6 finestre</strong> in tutto).</li>
-              <li>Le sostituzioni effettuate in una finestra diventano effettive <strong>dalla giornata successiva</strong>.</li>
-              <li>Le sostituzioni non utilizzate <strong>restano disponibili</strong> nelle finestre successive, sempre nel limite di <strong>3 per ruolo</strong> in totale.</li>
+              <li data-i18n="rules_full.s3_w_li1">Una finestra si apre <strong>ogni 5 giornate</strong> — dopo la G5, G10, G15, G20, G25 e G30 (<strong>6 finestre</strong> in tutto).</li>
+              <li data-i18n="rules_full.s3_w_li2">Le sostituzioni effettuate in una finestra diventano effettive <strong>dalla giornata successiva</strong>.</li>
+              <li data-i18n="rules_full.s3_w_li3">Le sostituzioni non utilizzate <strong>restano disponibili</strong> nelle finestre successive, sempre nel limite di <strong>3 per ruolo</strong> in totale.</li>
             </ul>
           </article>
 
           <article class="rulebook-section">
-            <h2><span class="rb-num">4</span> Bonus e Malus</h2>
+            <h2><span class="rb-num">4</span> <span data-i18n="rules_full.s4_title">Bonus e Malus</span></h2>
 
             <div class="rb-callout rb-callout-accent">
               <span class="material-symbols-outlined">star</span>
               <div>
-                <strong>Capitano</strong>
-                <p>Ogni rosa deve avere un Capitano. Il Capitano ottiene <strong>+2 punti</strong> al suo fantavoto ogni volta che riceve un <strong>voto base ≥ 7</strong>.<br>
+                <strong data-i18n="rules_full.s4_cap_title">Capitano</strong>
+                <p data-i18n="rules_full.s4_cap_p">Ogni rosa deve avere un Capitano. Il Capitano ottiene <strong>+2 punti</strong> al suo fantavoto ogni volta che riceve un <strong>voto base ≥ 7</strong>.<br>
                 Il Capitano <strong>non può essere un attaccante</strong> e <strong>non può essere cambiato né sostituito</strong> dopo la conferma della rosa.</p>
               </div>
             </div>
 
             <div class="rb-grid">
               <div class="rb-box">
-                <h3>⚽ Bonus gol</h3>
+                <h3 data-i18n="rules_full.s4_goals_title">⚽ Bonus gol</h3>
                 <table class="rb-table">
-                  <tr><td>Gol Portiere</td><td class="rb-pos">+5</td></tr>
-                  <tr><td>Gol Difensore</td><td class="rb-pos">+5</td></tr>
-                  <tr><td>Gol Centrocampista</td><td class="rb-pos">+4</td></tr>
-                  <tr><td>Gol Attaccante</td><td class="rb-pos">+3</td></tr>
+                  <tr><td data-i18n="rules_full.gk_goal">Gol Portiere</td><td class="rb-pos">+5</td></tr>
+                  <tr><td data-i18n="rules_full.def_goal">Gol Difensore</td><td class="rb-pos">+5</td></tr>
+                  <tr><td data-i18n="rules_full.mid_goal">Gol Centrocampista</td><td class="rb-pos">+4</td></tr>
+                  <tr><td data-i18n="rules_full.fwd_goal">Gol Attaccante</td><td class="rb-pos">+3</td></tr>
                 </table>
               </div>
 
               <div class="rb-box">
-                <h3>🎯 Bonus assist</h3>
+                <h3 data-i18n="rules_full.s4_assist_title">🎯 Bonus assist</h3>
                 <table class="rb-table">
-                  <tr><td>Assist Portiere</td><td class="rb-pos">+2</td></tr>
-                  <tr><td>Assist Difensore</td><td class="rb-pos">+2</td></tr>
-                  <tr><td>Assist Centrocampista</td><td class="rb-pos">+1,5</td></tr>
-                  <tr><td>Assist Attaccante</td><td class="rb-pos">+1</td></tr>
+                  <tr><td data-i18n="rules_full.gk_assist">Assist Portiere</td><td class="rb-pos">+2</td></tr>
+                  <tr><td data-i18n="rules_full.def_assist">Assist Difensore</td><td class="rb-pos">+2</td></tr>
+                  <tr><td data-i18n="rules_full.mid_assist">Assist Centrocampista</td><td class="rb-pos">+1,5</td></tr>
+                  <tr><td data-i18n="rules_full.fwd_assist">Assist Attaccante</td><td class="rb-pos">+1</td></tr>
                 </table>
               </div>
 
               <div class="rb-box">
-                <h3>🧤 Bonus portiere</h3>
+                <h3 data-i18n="rules_full.s4_gk_title">🧤 Bonus portiere</h3>
                 <table class="rb-table">
-                  <tr><td>Porta inviolata</td><td class="rb-pos">+2</td></tr>
-                  <tr><td>Rigore parato</td><td class="rb-pos">+3</td></tr>
-                  <tr><td>Gol subito</td><td class="rb-neg">−1</td></tr>
+                  <tr><td data-i18n="rules_full.clean_sheet">Porta inviolata</td><td class="rb-pos">+2</td></tr>
+                  <tr><td data-i18n="rules_full.pen_saved">Rigore parato</td><td class="rb-pos">+3</td></tr>
+                  <tr><td data-i18n="rules_full.goal_conceded">Gol subito</td><td class="rb-neg">−1</td></tr>
                 </table>
               </div>
 
               <div class="rb-box">
-                <h3>🟥 Malus</h3>
+                <h3 data-i18n="rules_full.s4_malus_title">🟥 Malus</h3>
                 <table class="rb-table">
-                  <tr><td>Ammonizione</td><td class="rb-neg">−0,5</td></tr>
-                  <tr><td>Espulsione</td><td class="rb-neg">−1</td></tr>
-                  <tr><td>Autogol</td><td class="rb-neg">−2</td></tr>
-                  <tr><td>Rigore sbagliato</td><td class="rb-neg">−3</td></tr>
+                  <tr><td data-i18n="rules_full.yellow">Ammonizione</td><td class="rb-neg">−0,5</td></tr>
+                  <tr><td data-i18n="rules_full.red">Espulsione</td><td class="rb-neg">−1</td></tr>
+                  <tr><td data-i18n="rules_full.own_goal">Autogol</td><td class="rb-neg">−2</td></tr>
+                  <tr><td data-i18n="rules_full.pen_missed">Rigore sbagliato</td><td class="rb-neg">−3</td></tr>
                 </table>
               </div>
             </div>
-            <p class="rb-note">I bonus e i malus si sommano al voto base. Esempio: un giocatore con voto <strong>6,5</strong> e un'ammonizione totalizza <strong>6,0</strong>.</p>
+            <p class="rb-note" data-i18n="rules_full.s4_note">I bonus e i malus si sommano al voto base. Esempio: un giocatore con voto <strong>6,5</strong> e un'ammonizione totalizza <strong>6,0</strong>.</p>
           </article>
 
           <article class="rulebook-section">
-            <h2><span class="rb-num">5</span> Risultati e classifica</h2>
+            <h2><span class="rb-num">5</span> <span data-i18n="rules_full.s5_title">Risultati e classifica</span></h2>
             <ul class="rb-list">
-              <li>Il gioco termina alla <strong>38ª giornata</strong> di campionato.</li>
-              <li>La classifica è determinata dalla <strong>somma totale dei punteggi di ogni giornata</strong>.</li>
-              <li>Vince chi totalizza il <strong>punteggio complessivo più alto</strong> al termine della stagione.</li>
+              <li data-i18n="rules_full.s5_li1">Il gioco termina alla <strong>38ª giornata</strong> di campionato.</li>
+              <li data-i18n="rules_full.s5_li2">La classifica è determinata dalla <strong>somma totale dei punteggi di ogni giornata</strong>.</li>
+              <li data-i18n="rules_full.s5_li3">Vince chi totalizza il <strong>punteggio complessivo più alto</strong> al termine della stagione.</li>
             </ul>
           </article>
 
@@ -508,8 +508,8 @@
       <!-- STATISTICHE LEGA -->
       <section id="page-stats" class="page">
         <div class="page-header">
-          <h1><span class="material-symbols-outlined header-icon">bar_chart</span> Statistiche Lega</h1>
-          <p class="subtitle">Analisi rose · Punteggi · Tracker Sostituzioni</p>
+          <h1><span class="material-symbols-outlined header-icon">bar_chart</span> <span data-i18n="stats.h1">Statistiche Lega</span></h1>
+          <p class="subtitle" data-i18n="stats.subtitle">Analisi rose · Punteggi · Tracker Sostituzioni</p>
         </div>
         <div id="stats-content"></div>
       </section>
@@ -552,11 +552,11 @@
         </div>
         <div class="giornata-filter-bar">
           <div class="filter-item">
-            <label>Giornata</label>
+            <label data-i18n="ui.matchday">Giornata</label>
             <select id="giornataSelectGiornata"></select>
           </div>
           <div class="filter-item">
-            <label>Cerca</label>
+            <label data-i18n="ui.search_label">Cerca</label>
             <input type="text" id="giornataSearch" placeholder="Nome partecipante..." data-i18n-ph="giornata.search_placeholder" style="min-width:160px">
           </div>
           <button class="btn-sec" id="btnExpandAll"><span class="material-symbols-outlined">unfold_more</span>
@@ -579,27 +579,27 @@
             </div>
             <div id="votiAdminControls" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
               <span style="font-size:12px;color:var(--green);font-weight:700;display:flex;align-items:center;"><span
-                  class="material-symbols-outlined" style="font-size:16px;margin-right:4px;">lock_open</span> Modalità
-                modifica</span>
+                  class="material-symbols-outlined" style="font-size:16px;margin-right:4px;">lock_open</span> <span data-i18n="voti.edit_mode">Modalità
+                modifica</span></span>
               <button class="btn-sec" id="btnLogout"><span class="material-symbols-outlined"
-                  style="font-size:16px;">logout</span> Esci</button>
+                  style="font-size:16px;">logout</span> <span data-i18n="voti.exit">Esci</span></button>
             </div>
             <div id="votiLoginControls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <input type="password" id="pwdInput" placeholder="Password admin..." data-i18n-ph="voti.pwd_placeholder" autocomplete="off"
                 style="width:150px">
               <button class="btn-sec" id="btnUnlock" style="font-size:12px;padding:6px 12px"><span
-                  class="material-symbols-outlined" style="font-size:16px;">lock_open</span> Modifica</button>
+                  class="material-symbols-outlined" style="font-size:16px;">lock_open</span> <span data-i18n="voti.edit_btn">Modifica</span></button>
               <p class="pwd-error" id="pwdError" style="margin:0"></p>
             </div>
           </div>
-          <div id="votiReadonlyNote" class="voti-banner" style="display:none">📋 I voti sono gestiti automaticamente (voti live delle partite) e dal gestore della competizione. Questa pagina è in sola lettura.</div>
+          <div id="votiReadonlyNote" class="voti-banner" style="display:none" data-i18n="voti_ui.readonly_note">📋 I voti sono gestiti automaticamente (voti live delle partite) e dal gestore della competizione. Questa pagina è in sola lettura.</div>
           <div class="voti-controls">
             <div class="filter-item">
-              <label>Squadra</label>
+              <label data-i18n="voti.squadra">Squadra</label>
               <select id="selectSquadra"></select>
             </div>
             <div class="filter-item">
-              <label>Giornata</label>
+              <label data-i18n="voti.giornata">Giornata</label>
               <select id="selectGiornata"></select>
             </div>
             <button class="btn-primary" id="btnSalvaVoti" style="display:none"><span
@@ -620,7 +620,7 @@
       <section id="page-giocatori" class="page">
         <div class="page-header">
           <h1><span class="material-symbols-outlined header-icon">groups</span> <span data-i18n="nav.giocatori">Giocatori</span></h1>
-          <p class="subtitle">Database giocatori selezionabili – aggiornato dal superadmin</p>
+          <p class="subtitle" data-i18n="giocatori.subtitle">Database giocatori selezionabili – aggiornato dal superadmin</p>
         </div>
         <div class="giocatori-toolbar">
           <div class="giocatori-search-wrap">
@@ -628,11 +628,11 @@
             <input type="text" id="giocatoriSearch" placeholder="Cerca giocatore o squadra..." data-i18n-ph="giocatori.search_placeholder" autocomplete="off">
           </div>
           <div class="giocatori-filtri">
-            <button class="gioc-filtro-btn active" data-ruolo="tutti">Tutti</button>
-            <button class="gioc-filtro-btn" data-ruolo="P">🧤 Portieri</button>
-            <button class="gioc-filtro-btn" data-ruolo="D">🛡 Difensori</button>
-            <button class="gioc-filtro-btn" data-ruolo="C">⚙️ Centrocampisti</button>
-            <button class="gioc-filtro-btn" data-ruolo="A">⚽ Attaccanti</button>
+            <button class="gioc-filtro-btn active" data-ruolo="tutti" data-i18n="giocatori.all">Tutti</button>
+            <button class="gioc-filtro-btn" data-ruolo="P" data-i18n="giocatori.portieri">🧤 Portieri</button>
+            <button class="gioc-filtro-btn" data-ruolo="D" data-i18n="giocatori.difensori">🛡 Difensori</button>
+            <button class="gioc-filtro-btn" data-ruolo="C" data-i18n="giocatori.centrocampisti">⚙️ Centrocampisti</button>
+            <button class="gioc-filtro-btn" data-ruolo="A" data-i18n="giocatori.attaccanti">⚽ Attaccanti</button>
           </div>
           <div id="giocatoriCount" class="giocatori-count"></div>
         </div>
@@ -642,13 +642,13 @@
       <!-- CHAT -->
       <section id="page-chat" class="page">
         <div class="page-header">
-          <h1><span class="material-symbols-outlined header-icon">forum</span> Chat di Lega</h1>
-          <p class="subtitle">Messaggi in tempo reale con la tua lega</p>
+          <h1><span class="material-symbols-outlined header-icon">forum</span> <span data-i18n="chat.h1">Chat di Lega</span></h1>
+          <p class="subtitle" data-i18n="chat.subtitle">Messaggi in tempo reale con la tua lega</p>
         </div>
         <div id="chatWrap" class="chat-wrap">
           <div id="chatMessages" class="chat-messages"></div>
           <div class="chat-input-row">
-            <input type="text" id="chatInput" class="chat-input" placeholder="Scrivi un messaggio..." maxlength="300" autocomplete="off">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Scrivi un messaggio..." maxlength="300" autocomplete="off" data-i18n-ph="chat.ph">
             <button id="btnChatSend" class="btn-primary chat-send-btn">
               <span class="material-symbols-outlined">send</span>
             </button>
@@ -670,11 +670,11 @@
           <div class="page-header"
             style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
-              <h1><span class="material-symbols-outlined header-icon">settings</span> Amministrazione</h1>
-              <p class="subtitle">Gestione partecipanti e rose</p>
+              <h1><span class="material-symbols-outlined header-icon">settings</span> <span data-i18n="admin.title">Amministrazione</span></h1>
+              <p class="subtitle" data-i18n="admin.subtitle">Gestione partecipanti e rose</p>
             </div>
             <button class="btn-sec" id="btnAdminLogout"><span class="material-symbols-outlined">logout</span>
-              Esci</button>
+              <span data-i18n="admin.exit">Esci</span></button>
           </div>
           <div class="admin-grid">
 
@@ -691,50 +691,50 @@
               <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
                 <button class="btn-sec" id="btnResetPartecipanti"
                   style="color:var(--red);border-color:var(--red);width:100%"><span
-                    class="material-symbols-outlined">delete_forever</span> Svuota partecipanti e rose</button>
+                    class="material-symbols-outlined">delete_forever</span> <span data-i18n="admin.clear">Svuota partecipanti e rose</span></button>
               </div>
             </div>
 
             <div class="admin-card">
               <h3><span class="material-symbols-outlined">upload_file</span> <span data-i18n="admin.load_squad">Carica Rosa da File</span></h3>
               <div class="field-group">
-                <label>Partecipante</label>
+                <label data-i18n="admin.participant_label">Partecipante</label>
                 <select id="selectPartecipanteImport"></select>
               </div>
               <div class="upload-box" id="uploadBox">
                 <div class="upload-icon"><span class="material-symbols-outlined upload-icon-sym">cloud_upload</span>
                 </div>
-                <p>Carica file rosa (.csv)</p>
-                <small>Formato: Ruolo,Giocatore,Nazione</small>
+                <p data-i18n="admin.file_label">Carica file rosa (.csv)</p>
+                <small data-i18n="admin.file_format">Formato: Ruolo,Giocatore,Club</small>
                 <input type="file" id="rosaFileInput" accept=".xlsx,.xls,.csv" style="display:none">
               </div>
               <div id="importResult" class="parse-result"></div>
               <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-                <p class="hint" style="margin-bottom:8px">Oppure inserisci manualmente:</p>
+                <p class="hint" style="margin-bottom:8px" data-i18n="admin.manual_label">Oppure inserisci manualmente:</p>
                 <button class="btn-sec" id="btnManualRosa"><span class="material-symbols-outlined">edit_note</span>
-                  Inserimento manuale</button>
+                  <span data-i18n="admin.manual_btn">Inserimento manuale</span></button>
               </div>
             </div>
 
             
 
             <div class="admin-card">
-              <h3><span class="material-symbols-outlined">schedule</span> Deadline creazione rose</h3>
-              <p class="hint">Fino a questa data/ora i partecipanti possono creare e modificare liberamente la rosa. Dopo, la rosa si blocca e si cambia solo tramite le finestre di sostituzione. Lascia vuoto = nessuna scadenza (rosa sempre modificabile).</p>
+              <h3><span class="material-symbols-outlined">schedule</span> <span data-i18n="admin_ui.deadline_title">Deadline creazione rose</span></h3>
+              <p class="hint" data-i18n="admin_ui.deadline_hint">Fino a questa data/ora i partecipanti possono creare e modificare liberamente la rosa. Dopo, la rosa si blocca e si cambia solo tramite le finestre di sostituzione. Lascia vuoto = nessuna scadenza (rosa sempre modificabile).</p>
               <div class="field-group">
-                <label>Data e ora (fuso locale)</label>
+                <label data-i18n="admin_ui.datetime_label">Data e ora (fuso locale)</label>
                 <input type="datetime-local" id="adminDeadlineInput">
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-                <button class="btn-primary" id="btnSalvaDeadline">💾 Salva deadline</button>
-                <button class="btn-sec" id="btnRimuoviDeadline">✕ Nessuna scadenza</button>
+                <button class="btn-primary" id="btnSalvaDeadline" data-i18n="admin_ui.save_deadline">💾 Salva deadline</button>
+                <button class="btn-sec" id="btnRimuoviDeadline" data-i18n="admin_ui.no_deadline_btn">✕ Nessuna scadenza</button>
               </div>
               <div id="adminDeadlineStatus" class="hint" style="margin-top:8px"></div>
             </div>
 
             <div class="admin-card">
               <h3><span class="material-symbols-outlined">star</span> <span data-i18n="admin.captains">Capitani</span></h3>
-              <p class="hint">Imposta il capitano (+2 pt se voto ≥ 7, non attaccanti).</p>
+              <p class="hint" data-i18n="admin.captains_desc">Imposta il capitano (+2 pt se voto ≥ 7, non attaccanti).</p>
               <div id="capitanoForm"></div>
             </div>
 
@@ -745,31 +745,31 @@
             </div>
 
             <div class="admin-card" id="adminPushCard">
-              <h3><span class="material-symbols-outlined">notifications_active</span> Notifiche Push</h3>
-              <p class="hint">Invia una notifica push a tutti i partecipanti che l'hanno attivata.</p>
+              <h3><span class="material-symbols-outlined">notifications_active</span> <span data-i18n="admin_ui.push_notifications">Notifiche Push</span></h3>
+              <p class="hint" data-i18n="admin_ui.push_hint">Invia una notifica push a tutti i partecipanti che l'hanno attivata.</p>
               <div id="pushSubCount" class="hint" style="margin-bottom:12px;color:var(--accent)"></div>
               <div class="field-group" style="margin-bottom:8px">
-                <label>Titolo</label>
-                <input type="text" id="pushTitle" value="ArenaSerieA" placeholder="Titolo notifica" maxlength="80">
+                <label data-i18n="admin_ui.title_label">Titolo</label>
+                <input type="text" id="pushTitle" value="ArenaSerieA" placeholder="Titolo notifica" maxlength="80" data-i18n-ph="admin_ui.ph_push_title">
               </div>
               <div class="field-group" style="margin-bottom:12px">
-                <label>Messaggio</label>
-                <input type="text" id="pushBody" placeholder="Testo notifica" maxlength="200" value="Voti disponibili! Controlla la classifica 🏆">
+                <label data-i18n="admin_ui.message_label">Messaggio</label>
+                <input type="text" id="pushBody" placeholder="Testo notifica" maxlength="200" value="Voti disponibili! Controlla la classifica 🏆" data-i18n-ph="admin_ui.ph_push_body">
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <button class="btn-primary" id="btnSendPush">
-                  <span class="material-symbols-outlined">send</span> Invia a tutti
+                  <span class="material-symbols-outlined">send</span> <span data-i18n="admin_ui.send_all">Invia a tutti</span>
                 </button>
-                <button class="btn-sec" id="btnPushPresetVoti" style="font-size:12px;padding:5px 10px">⚡ "Voti pronti"</button>
-                <button class="btn-sec" id="btnPushPresetClassifica" style="font-size:12px;padding:5px 10px">🏆 "Classifica aggiornata"</button>
+                <button class="btn-sec" id="btnPushPresetVoti" style="font-size:12px;padding:5px 10px" data-i18n="admin_ui.preset_voti">⚡ "Voti pronti"</button>
+                <button class="btn-sec" id="btnPushPresetClassifica" style="font-size:12px;padding:5px 10px" data-i18n="admin_ui.preset_classifica">🏆 "Classifica aggiornata"</button>
               </div>
               <div id="pushSendResult" style="margin-top:10px;font-size:12px"></div>
             </div>
 
             <div class="admin-card admin-card-danger" style="grid-column: 1 / -1">
               <h3><span class="material-symbols-outlined">delete_forever</span> <span data-i18n="admin.danger">Zona Pericolosa</span></h3>
-              <p class="hint">Questa azione è <strong>irreversibile</strong>. La lega, tutti i partecipanti, le rose e i voti verranno eliminati definitivamente.</p>
-              <button class="btn-danger" id="btnEliminaLega">🗑️ Elimina questa Lega</button>
+              <p class="hint" data-i18n="admin.danger_text">Questa azione è <strong>irreversibile</strong>. La lega, tutti i partecipanti, le rose e i voti verranno eliminati definitivamente.</p>
+              <button class="btn-danger" id="btnEliminaLega">🗑️ <span data-i18n="admin.delete_league">Elimina questa Lega</span></button>
             </div>
 
             
@@ -788,18 +788,17 @@
     <footer style="text-align:center;padding:24px 16px 40px;border-top:1px solid var(--border);margin-top:40px;">
       <p style="color:var(--text2);font-size:13px;margin-bottom:6px;" data-i18n="footer.tagline">🏆 ArenaSerieA — Gioco fantasy gratuito a scopo puramente ricreativo e non commerciale</p>
       <p style="color:var(--text3);font-size:12px;margin-bottom:6px;max-width:700px;margin-left:auto;margin-right:auto;line-height:1.6;">
-        © 2026 <strong style="color:var(--text2)">Lorenzo Simonazzi</strong> — Tutti i diritti riservati sul codice e sui contenuti originali di ArenaSerieA (fantaarena.it/champions).
-        È vietata la riproduzione, anche parziale, senza autorizzazione scritta dell'autore.
+        © 2026 <strong style="color:var(--text2)">Lorenzo Simonazzi</strong> <span data-i18n="footer.copyright_post">— Tutti i diritti riservati sul codice e sui contenuti originali di ArenaSerieA (fantaarena.it/seriea). È vietata la riproduzione, anche parziale, senza autorizzazione scritta dell'autore.</span>
       </p>
-      <p style="color:var(--text3);font-size:12px;margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto;line-height:1.6;">
+      <p style="color:var(--text3);font-size:12px;margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto;line-height:1.6;" data-i18n="footer.disclaimer">
         I voti, le statistiche e i dati di gioco sono forniti da <a href="https://www.sofascore.com" target="_blank" rel="noopener" style="color:var(--text2);text-decoration:none;">Sofascore</a>,
         di cui ArenaSerieA non rivendica alcuna proprietà. I nomi, i loghi e i marchi relativi alla Lega Serie A,
         ai club di calcio e ai calciatori appartengono ai rispettivi titolari e sono citati
         esclusivamente a scopo informativo e ludico.
       </p>
       <div style="display:flex;justify-content:center;gap:20px;flex-wrap:wrap;">
-        <a href="privacy.html" style="color:var(--text2);font-size:13px;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">Privacy Policy</a>
-        <a href="cookie-policy.html" style="color:var(--text2);font-size:13px;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">Cookie Policy</a>
+        <a href="privacy.html" style="color:var(--text2);font-size:13px;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'" data-i18n="footer.privacy">Privacy Policy</a>
+        <a href="cookie-policy.html" style="color:var(--text2);font-size:13px;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'" data-i18n="footer.cookie">Cookie Policy</a>
         <a href="termini.html" style="color:var(--text2);font-size:13px;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'" data-i18n="footer.terms">Termini e Condizioni</a>
         <button onclick="resetCookieConsent()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;padding:0;text-decoration:none;transition:color .2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'" data-i18n="footer.manage_cookies">Gestisci Cookie</button>
       </div>
@@ -816,7 +815,7 @@
       </div>
       <div class="modal-body">
         <div class="field-group" style="margin-bottom:16px">
-          <label>Partecipante</label>
+          <label data-i18n="admin.participant_label">Partecipante</label>
           <select id="manualPartSelect" style="width:100%"></select>
         </div>
         <div id="manualRosaForm"></div>
@@ -833,7 +832,9 @@
   <!-- Serie A: popola i menu giornata con 38 giornate -->
   <script>
     (function () {
-      const opts = Array.from({ length: 38 }, (_, i) => `<option value="${i + 1}">Giornata ${i + 1}</option>`).join("");
+      if (typeof populateGiornataSelects === "function") { populateGiornataSelects(); return; }
+      const lbl = (typeof t === "function") ? t("ui.matchday") : "Giornata";
+      const opts = Array.from({ length: 38 }, (_, i) => `<option value="${i + 1}">${lbl} ${i + 1}</option>`).join("");
       ["giornataSelectGiornata", "selectGiornata"].forEach(id => {
         const el = document.getElementById(id);
         if (el && !el.options.length) el.innerHTML = opts;
