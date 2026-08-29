@@ -312,7 +312,7 @@ document.getElementById("drawerClose")?.addEventListener("click", closeMainDrawe
 document.getElementById("drawerOverlay")?.addEventListener("click", closeMainDrawer);
 
 function renderPage(p){
-  if(p==="home")     { renderAnnounceBanner(); renderWinnerBanner(); }
+  if(p==="home")     { renderHomeButtons(); renderAnnounceBanner(); renderWinnerBanner(); }
   if(p==="classifica")renderClassifica();
   if(p==="stats")    renderStats();
   if(p==="squadra")renderSquadraPage();
