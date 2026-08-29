@@ -1301,7 +1301,7 @@ const TRANSLATIONS = {
 
 let currentLang = (function () {
   const q = new URLSearchParams(location.search).get("lang");
-  const v = (q || localStorage.getItem("ucl_lang") || "it").toLowerCase();
+  const v = (q || localStorage.getItem("asa_lang") || "it").toLowerCase();
   return (v === "it" || v === "en") ? v : "it";
 })();
 
@@ -1321,7 +1321,7 @@ function t(key, vars) {
 
 function setLang(lang) {
   currentLang = lang;
-  localStorage.setItem("ucl_lang", lang);
+  localStorage.setItem("asa_lang", lang);
   document.documentElement.lang = lang;
   applyTranslations();
   // Re-populate JS-built giornata selects with the new language

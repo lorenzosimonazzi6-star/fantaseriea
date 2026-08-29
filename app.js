@@ -141,8 +141,8 @@ function isClubEliminato(club, forGiornata) {
 function isNazioneEliminata(naz, forGiornata) { return isClubEliminato(naz, forGiornata); }
 function sanitizeState(s){return sanitizeLegaState(s);}
 
-function loadLegaState(id){try{const r=localStorage.getItem("ucl_lega_"+id);if(r)return sanitizeLegaState(JSON.parse(r));}catch(e){}return defaultLegaState();}
-function loadGlobalState(){try{const r=localStorage.getItem("ucl_global");if(r)return sanitizeGlobalState(JSON.parse(r));}catch(e){}return defaultGlobalState();}
+function loadLegaState(id){try{const r=localStorage.getItem("asa_lega_"+id);if(r)return sanitizeLegaState(JSON.parse(r));}catch(e){}return defaultLegaState();}
+function loadGlobalState(){try{const r=localStorage.getItem("asa_global");if(r)return sanitizeGlobalState(JSON.parse(r));}catch(e){}return defaultGlobalState();}
 function loadState(){return defaultLegaState();}
 
 let state=defaultLegaState();
@@ -153,13 +153,13 @@ let sortBy="totale";
 
 function saveState(){
   state._updatedAt=Date.now();
-  if(currentLegaId){try{localStorage.setItem("ucl_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}syncLegaToFirebase();}
+  if(currentLegaId){try{localStorage.setItem("asa_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}syncLegaToFirebase();}
 }
 function saveGlobalState(){
   globalState._updatedAt=Date.now();
-  try{localStorage.setItem("ucl_global",JSON.stringify(globalState));}catch(e){}syncGlobalToFirebase();
+  try{localStorage.setItem("asa_global",JSON.stringify(globalState));}catch(e){}syncGlobalToFirebase();
 }
-function saveLocalOnly(){if(currentLegaId)try{localStorage.setItem("ucl_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}}
+function saveLocalOnly(){if(currentLegaId)try{localStorage.setItem("asa_lega_"+currentLegaId,JSON.stringify(state));}catch(e){}}
 
 // ── HASH ─────────────────────────────────────────────────────
 async function sha256(str) {
@@ -221,7 +221,7 @@ function listenGlobal(){
     const d=snap.val();if(!d)return;
     if((d._updatedAt||0)<=(globalState._updatedAt||0))return;
     globalState=sanitizeGlobalState(d);
-    localStorage.setItem("ucl_global",JSON.stringify(globalState));
+    localStorage.setItem("asa_global",JSON.stringify(globalState));
     renderPage(currentPage());showSyncBar(t("ui.sync_dati"),2000);
   });
 }
@@ -245,7 +245,7 @@ function _fbReattach(){
   // Rileggi da localStorage (cache locale) + riaggiancia i listener live
   if(currentLegaId){
     try{
-      const cached=localStorage.getItem("ucl_lega_"+currentLegaId);
+      const cached=localStorage.getItem("asa_lega_"+currentLegaId);
       if(cached){const d=JSON.parse(cached);if((d._updatedAt||0)>=(state._updatedAt||0))state=sanitizeLegaState(d);}
     }catch(e){}
   }
@@ -265,7 +265,7 @@ window.addEventListener("pageshow", e => { if(e.persisted) _fbReattach(); });
 
 
 function saveLocalOnly() {
-  try { localStorage.setItem("ucl_state_v1", JSON.stringify(state)); } catch(e){}
+  try { localStorage.setItem("asa_state_v1", JSON.stringify(state)); } catch(e){}
 }
 
 let syncBarTimer;
@@ -293,7 +293,7 @@ function currentPage() { return _currentPage; }
 
 function navigate(page){
   _currentPage=page;
-  if(currentLegaId) localStorage.setItem("ucl_tab", page);
+  if(currentLegaId) localStorage.setItem("asa_tab", page);
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
   const el=document.getElementById("page-"+page);
@@ -3330,7 +3330,7 @@ function exitLega() {
   _playerRoseState = {};
   adminUnlocked = false; votiUnlocked = false; superadminUnlocked = false;
   aggiornaTabAdmin();
-  localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
+  localStorage.removeItem("asa_lastLega"); localStorage.removeItem("asa_lastLegaMeta");
   history.pushState(null, '', location.pathname);
   // Hide nav tabs (keep logo and sidebar btn)
   document.querySelector(".nav-links")?.style && (document.querySelector(".nav-links").style.display="none");
@@ -3505,8 +3505,8 @@ function renderSuperadminPage() {
     if (!window._fbReady || !window._db) return;
     await window._set(window._ref(window._db, "leghe"), null);
     await window._set(window._ref(window._db, "indice"), null);
-    Object.keys(localStorage).filter(k => k.startsWith("ucl_lega_")).forEach(k => localStorage.removeItem(k));
-    localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
+    Object.keys(localStorage).filter(k => k.startsWith("asa_lega_")).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem("asa_lastLega"); localStorage.removeItem("asa_lastLegaMeta");
     toast(t("toast.leagues_deleted")); renderSuperadminPage();
   });
   document.getElementById("btnDelAll")?.addEventListener("click", async () => {
@@ -4009,8 +4009,8 @@ function aggiornaTabAdmin() {
 async function entraInLega(legaId, legaMeta) {
   currentLegaId = legaId; currentLegaMeta = legaMeta || null;
   state = sanitizeLegaState(null);
-  localStorage.setItem("ucl_lastLega", legaId);
-  if (legaMeta) localStorage.setItem("ucl_lastLegaMeta", JSON.stringify(legaMeta));
+  localStorage.setItem("asa_lastLega", legaId);
+  if (legaMeta) localStorage.setItem("asa_lastLegaMeta", JSON.stringify(legaMeta));
   // Update URL
   history.pushState(null, '', '?lega=' + legaId);
   const navLinks = document.querySelector(".nav-links");
@@ -4033,7 +4033,7 @@ async function entraInLega(legaId, legaMeta) {
   listenGlobal(); listenLega(legaId);
   subscribePlayerSostituzioni(legaId);
   subscribePlayerRose(legaId);
-  const savedTab = localStorage.getItem("ucl_tab");
+  const savedTab = localStorage.getItem("asa_tab");
   navigate(savedTab && savedTab !== "home" ? savedTab : "home");
   initPushBtn();
 }
@@ -4045,8 +4045,8 @@ function exitLega() {
   _playerRoseState = {};
   adminUnlocked = false; votiUnlocked = false; superadminUnlocked = false;
   aggiornaTabAdmin();
-  localStorage.removeItem("ucl_lastLega"); localStorage.removeItem("ucl_lastLegaMeta");
-  localStorage.removeItem("ucl_tab");
+  localStorage.removeItem("asa_lastLega"); localStorage.removeItem("asa_lastLegaMeta");
+  localStorage.removeItem("asa_tab");
   history.pushState(null, '', location.pathname);
   const navLinks = document.querySelector(".nav-links");
   const hamburger = document.getElementById("hamburger");
@@ -4314,10 +4314,10 @@ function checkUrlLega() {
   if (currentLegaId) return true; // già in una lega (es. entrati via onAuthStateChanged): non riaprire la lobby
   const params = new URLSearchParams(location.search);
   const legaId = params.get("lega")?.toUpperCase();
-  if (legaId) localStorage.setItem("ucl_lastLega", legaId);
+  if (legaId) localStorage.setItem("asa_lastLega", legaId);
   // L'ingresso effettivo richiede auth + membership: lo esegue onAuthStateChanged
   // appena l'utente è noto. Qui mostriamo la lobby se c'è un target da aprire.
-  if (legaId || localStorage.getItem("ucl_lastLega")) { showLobby(); return true; }
+  if (legaId || localStorage.getItem("asa_lastLega")) { showLobby(); return true; }
   return false;
 }
 
@@ -4377,7 +4377,7 @@ function startApp() {
       const d=snap.val();
       if(d&&(d._updatedAt||0)>(globalState._updatedAt||0)){
         globalState=sanitizeGlobalState(d);
-        localStorage.setItem("ucl_global",JSON.stringify(globalState));
+        localStorage.setItem("asa_global",JSON.stringify(globalState));
       }
       if(!checkUrlLega()){
         renderHomeButtons();
@@ -4405,7 +4405,7 @@ function initAuth() {
       currentUser=user;
       if(!currentLegaId){
         const params = new URLSearchParams(location.search);
-        const target = (params.get("lega")?.toUpperCase()) || localStorage.getItem("ucl_lastLega");
+        const target = (params.get("lega")?.toUpperCase()) || localStorage.getItem("asa_lastLega");
         if(user && target){ joinLegaById(target); return; }
         renderHomeButtons();
         renderSidebar();
