@@ -3953,11 +3953,21 @@ async function _resolveCodice(codice){
   });
 }
 // Entra in una lega dato l'id: valida via meta (pubblico), poi entraInLega (che crea la membership).
-async function joinLegaById(id, closeFn){
+async function joinLegaById(id, closeFn, auto){
   if(!id) return;
-  if(!currentUser){ toast(t("toast.login_to_join"), true); return; }
+  if(!currentUser){ if(!auto) toast(t("toast.login_to_join"), true); return; }
   const meta = await _fetchLegaMeta(id);
-  if(!meta){ toast(t("toast.league_not_found"), true); return; }
+  if(!meta){
+    // Auto-rientro nell'ultima lega salvata ma non più esistente (es. eliminata):
+    // pulisci il riferimento e torna alla home senza mostrare errori.
+    if(auto){
+      if(localStorage.getItem("asa_lastLega")===id) localStorage.removeItem("asa_lastLega");
+      renderHomeButtons(); renderSidebar(); navigate("home");
+    } else {
+      toast(t("toast.league_not_found"), true);
+    }
+    return;
+  }
   if(typeof closeFn==="function") closeFn();
   await entraInLega(id, meta);
 }
@@ -4405,8 +4415,9 @@ function initAuth() {
       currentUser=user;
       if(!currentLegaId){
         const params = new URLSearchParams(location.search);
-        const target = (params.get("lega")?.toUpperCase()) || localStorage.getItem("asa_lastLega");
-        if(user && target){ joinLegaById(target); return; }
+        const legaParam = params.get("lega")?.toUpperCase();
+        const target = legaParam || localStorage.getItem("asa_lastLega");
+        if(user && target){ joinLegaById(target, null, !legaParam); return; }
         renderHomeButtons();
         renderSidebar();
       }
