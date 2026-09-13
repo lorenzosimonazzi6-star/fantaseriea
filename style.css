@@ -2094,3 +2094,19 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
 .game-switch-menu a.current { color: var(--accent); pointer-events: none; }
 .game-switch-menu a.current::after { content: "\25CF"; margin-left: auto; font-size: 9px; }
 .game-switch-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
+/* ── Pulsante Google Sign-In (aggiunto) ─────────────────── */
+.btn-google {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fff; color: #3c4043; border: 1px solid #dadce0; border-radius: 8px;
+  padding: 10px 14px; font-weight: 600; font-size: 14px; cursor: pointer;
+  font-family: inherit; transition: box-shadow .15s, background .15s;
+}
+.btn-google:hover, .btn-google:focus-visible { background: #f7f8f8; box-shadow: 0 1px 3px rgba(0,0,0,.25); outline: none; }
+.btn-google:disabled { cursor: default; }
+.btn-google svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--text2); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.auth-consent-note { font-size: 11px; color: var(--text2); text-align: center; margin-top: 8px; line-height: 1.45; }
+.auth-consent-note a { color: var(--accent); text-decoration: none; }
+.fa-google-err { margin-top: 6px; }
