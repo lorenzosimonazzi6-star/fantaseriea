@@ -14,7 +14,10 @@ const admin = require("firebase-admin");
 // Serie A: 38 giornate, nessun knockout.
 // TODO: incollare qui lo stesso calendario di matches.js (con home/away/kickoff/eventId)
 // quando gli eventId SofaScore sono disponibili. Finché gli array restano vuoti il poller è inerte.
-const MATCHES = Object.fromEntries(Array.from({ length: 38 }, (_, i) => [String(i + 1), []]));
+// Calendario Serie A letto da matches.js (riempi li' gli eventId: un solo posto).
+let MATCHES = {};
+try { MATCHES = require("../../matches.js").MATCHES || {}; }
+catch (e) { console.warn("[poller] matches.js non caricato:", e.message); }
 
 // Serie A: campionato senza fasi eliminatorie → nessuna giornata "elim" (niente ET/rigori)
 const GIORNATE_ELIMINATORIE = new Set();
@@ -25,6 +28,30 @@ const FINESTRA_EXTENDED_MS  =   7 * 60 * 60 * 1000; // 7h extra dopo fine finest
 const POLLING_LIVE_MS       =  15 * 60 * 1000; // 15 min — live normale
 const POLLING_ET_MS         =   1 * 60 * 1000; // 1 min  — supplementari rilevati (cron */1)
 const POLLING_EXTENDED_MS   =  60 * 60 * 1000; // 60 min — fase estesa post-partita
+
+// ── NUOVA CADENZA CAMPIONATO/GIRONI: due poll per partita ──
+// 1a chiamata a KO+50min, 2a chiamata a KO+2h30 (150min).
+const POLL_OFFSETS_MS = [50 * 60 * 1000, 150 * 60 * 1000];
+// La partita di campionato/gironi resta "attiva" fino a KO + ultimo offset + margine
+// ampio (recupero se la function e' stata giu').
+const LEAGUE_ACTIVE_MS = POLL_OFFSETS_MS[POLL_OFFSETS_MS.length - 1] + 6 * 60 * 60 * 1000;
+
+// Campionato/gironi: al piu' un poll per run, al raggiungimento del prossimo offset da fare.
+async function shouldPollOffset(db, eventId, nowMs, kickoffMs) {
+  const ref  = db.ref(`pollerState/${eventId}/lastOffsetDone`);
+  const snap = await ref.once("value");
+  const raw  = snap.val();
+  const lastDone = (raw === null || raw === undefined) ? -1 : raw;
+  let dueIdx = -1;
+  for (let i = 0; i < POLL_OFFSETS_MS.length; i++) {
+    if (nowMs >= kickoffMs + POLL_OFFSETS_MS[i]) dueIdx = i;
+  }
+  if (dueIdx > lastDone) {
+    await ref.set(dueIdx);
+    return { poll: true, offsetIndex: dueIdx };
+  }
+  return { poll: false, offsetIndex: lastDone };
+}
 
 // ── FIREBASE ADMIN INIT ────────────────────────────────────
 let firebaseApp;
@@ -44,11 +71,19 @@ function getFirebase() {
 function getActiveMatches(nowMs) {
   const active = [];
   for (const [gId, matches] of Object.entries(MATCHES)) {
-    const finestraLive = GIORNATE_ELIMINATORIE.has(gId) ? FINESTRA_ELIM_MS : FINESTRA_LEAGUE_MS;
+    const isElim = GIORNATE_ELIMINATORIE.has(gId);
     for (const match of matches) {
       if (!match.eventId || !match.kickoff) continue;
-      const ko          = new Date(match.kickoff).getTime();
-      const endLive     = ko + finestraLive;
+      const ko = new Date(match.kickoff).getTime();
+      if (!isElim) {
+        // Campionato/gironi: due poll a offset fissi dal kickoff (KO+50min, KO+2h30).
+        if (nowMs >= ko && nowMs <= ko + LEAGUE_ACTIVE_MS) {
+          active.push({ ...match, giornata: gId, phase: "league" });
+        }
+        continue;
+      }
+      // Eliminatorie: logica a finestre (live/extended) invariata.
+      const endLive     = ko + FINESTRA_ELIM_MS;
       const endExtended = endLive + FINESTRA_EXTENDED_MS;
       if (nowMs >= ko && nowMs <= endLive) {
         active.push({ ...match, giornata: gId, phase: "live" });
@@ -467,6 +502,33 @@ exports.handler = async function () {
   const results = [];
   for (const match of activeMatches) {
     const isElim = GIORNATE_ELIMINATORIE.has(match.giornata);
+
+    // ── Campionato/gironi: cadenza a due poll (KO+50min, KO+2h30) ──
+    if (match.phase === "league") {
+      const kickoffMs = new Date(match.kickoff).getTime();
+      const { poll, offsetIndex } = await shouldPollOffset(db, match.eventId, now, kickoffMs);
+      if (!poll) {
+        results.push(`\u23ed ${match.home}-${match.away}: in attesa prossimo poll`);
+        continue;
+      }
+      try {
+        const [lineups, incidents] = await Promise.all([
+          fetchRapidAPI(`/matches/get-lineups?matchId=${match.eventId}`),
+          fetchRapidAPI(`/matches/get-incidents?matchId=${match.eventId}`),
+        ]);
+        const voti = await parseLineups(lineups, incidents, match, playerIndex, playerAliases);
+        await writeVoti(db, match.giornata, voti);
+        const nHome = Object.keys(voti[match.home] || {}).length;
+        const nAway = Object.keys(voti[match.away] || {}).length;
+        const label = offsetIndex === 0 ? "KO+50m" : "KO+2h30";
+        results.push(`\u2713 ${match.home}(${nHome}) - ${match.away}(${nAway}) [${label}]`);
+        console.log(`[poller] \u2713 ${match.home}-${match.away}: ${nHome}+${nAway} voti (${label})`);
+      } catch (err) {
+        results.push(`\u2717 ${match.home}-${match.away}: ${err.message}`);
+        console.error(`[poller] \u2717 ${match.home}-${match.away}:`, err.message);
+      }
+      continue;
+    }
 
     // Salta se la partita è già stata congelata (rigori rilevati in precedenza)
     const frozen = await isMatchFrozen(db, match.eventId);
