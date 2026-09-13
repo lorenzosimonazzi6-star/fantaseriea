@@ -2065,3 +2065,6 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
 .stats-search-table tbody td:first-child {
   width: 36px; color: var(--text2); font-size: 12px;
 }
+
+/* Fantasy Arena — focus visibile da tastiera (a11y, aggiunto) */
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }

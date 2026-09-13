@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 – Pagina non trovata | Fantasy Arena</title>
+  <meta name="robots" content="noindex, follow">
+  <style>
+    :root{ --bg:#050D1A; --text:#EAF2FF; --text2:#7C93B3; --gold:#F5C518; --border:#1E3A5F; --surface:rgba(255,255,255,.04); }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{ height:100%; }
+    body{
+      font-family:'Inter',system-ui,Arial,sans-serif; color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 50% -10%, rgba(245,197,24,.12), transparent 60%),
+        radial-gradient(900px 500px at 90% 100%, rgba(30,58,95,.5), transparent 60%),
+        var(--bg);
+      min-height:100%; display:flex; flex-direction:column; align-items:center;
+      justify-content:center; text-align:center; padding:40px 20px; gap:8px;
+    }
+    .code{ font-size:clamp(72px,18vw,140px); font-weight:800; letter-spacing:2px; line-height:1;
+      background:linear-gradient(135deg,var(--gold),#fff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    h1{ font-size:clamp(20px,4vw,28px); margin-top:4px; }
+    p{ color:var(--text2); max-width:420px; line-height:1.6; margin:8px auto 0; font-size:15px; }
+    .home{ display:inline-block; margin-top:24px; padding:12px 26px; border-radius:999px;
+      background:var(--gold); color:#0A1420; font-weight:700; text-decoration:none;
+      transition:transform .15s ease, box-shadow .15s ease; }
+    .home:hover, .home:focus-visible{ transform:translateY(-2px); box-shadow:0 10px 30px rgba(245,197,24,.25); outline:none; }
+    :focus-visible{ outline:2px solid var(--gold); outline-offset:3px; border-radius:6px; }
+    .sub{ font-size:13px; color:var(--text2); opacity:.8; margin-top:2px; }
+  </style>
+</head>
+<body>
+  <div class="code">404</div>
+  <h1>Pagina non trovata</h1>
+  <p>La pagina che cerchi non esiste o è stata spostata.<br><span class="sub">The page you are looking for doesn't exist or has been moved.</span></p>
+  <a class="home" href="/">← Torna alla home · Back home</a>
+</body>
+</html>

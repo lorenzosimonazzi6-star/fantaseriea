@@ -3092,6 +3092,7 @@ function renderSidebar() {
         <div class="field-group"><label>${t("ui.name_surname")}</label><input type="text" id="sidebarNome" placeholder="${t("ui.ph_name")}" autocomplete="name"></div>
         <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="sidebarRegEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
         <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="sidebarRegPwd" placeholder="${t("ui.ph_min6")}" autocomplete="new-password"></div>
+        ${_faConsentField('sidebarRegConsent')}
         <button class="btn-primary" id="btnSidebarRegister" style="width:100%">${t("ui.create_account")}</button>
         <p class="pwd-error" id="sidebarRegErr"></p>
       </div>`;
@@ -3155,6 +3156,7 @@ function renderSidebar() {
       const email = document.getElementById("sidebarRegEmail").value.trim();
       const pwd = document.getElementById("sidebarRegPwd").value;
       const err = document.getElementById("sidebarRegErr");
+      { const _c=document.getElementById("sidebarRegConsent"); if(!_c||!_c.checked){ err.textContent=_faConsentRequired(); return; } }
       if (!nome||!email||!pwd) { err.textContent=t("toast.fill_all_fields"); return; }
       document.getElementById("btnSidebarRegister").textContent="⏳...";
       const res = await signUp(email, pwd, nome);
@@ -4129,6 +4131,7 @@ function renderLobby() {
           <div class="field-group"><label>${t("ui.name_surname")}</label><input type="text" id="regNome" placeholder="${t("ui.ph_name")}" autocomplete="name"></div>
           <div class="field-group"><label>${t("ui.email")}</label><input type="email" id="regEmail" placeholder="${t("ui.ph_email")}" autocomplete="email"></div>
           <div class="field-group"><label>${t("ui.password")}</label><input type="password" id="regPwd" placeholder="${t("ui.ph_min6")}" autocomplete="new-password"></div>
+          ${_faConsentField('regConsent')}
           <button class="btn-primary" id="btnRegister" style="width:100%">${t("ui.create_account")}</button>
           <p class="pwd-error" id="regError"></p>
         </div>
@@ -4217,6 +4220,7 @@ function renderLobby() {
       const email = document.getElementById("regEmail").value.trim();
       const pwd = document.getElementById("regPwd").value;
       const err = document.getElementById("regError");
+      { const _c=document.getElementById("regConsent"); if(!_c||!_c.checked){ err.textContent=_faConsentRequired(); return; } }
       if (!nome || !email || !pwd) { err.textContent = t("toast.fill_all_fields"); return; }
       document.getElementById("btnRegister").textContent = "⏳...";
       const res = await signUp(email, pwd, nome);
@@ -5457,3 +5461,41 @@ function _startTimer() {
   updateTimer();
   _timerInterval = setInterval(updateTimer, 1000);
 }
+
+
+/* ── Fantasy Arena — consenso privacy in registrazione + accessibilità (aggiunto) ── */
+function _faLangEn(){ return (document.documentElement.lang || "it").slice(0,2).toLowerCase() === "en"; }
+function _faConsentHtml(){
+  return _faLangEn()
+    ? 'I have read and accept the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and the <a href="termini.html" target="_blank" rel="noopener">Terms &amp; Conditions</a>.'
+    : 'Ho letto e accetto la <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a> e i <a href="termini.html" target="_blank" rel="noopener">Termini e Condizioni</a>.';
+}
+function _faConsentRequired(){
+  return _faLangEn()
+    ? "You must accept the Privacy Policy and Terms to create an account."
+    : "Devi accettare la Privacy Policy e i Termini per creare un account.";
+}
+function _faConsentField(id){
+  return '<label class="fa-consent" style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.45;color:var(--text2);margin:2px 0 12px;text-align:left;cursor:pointer">'
+    + '<input type="checkbox" id="' + id + '" style="margin-top:2px;flex:0 0 auto;width:16px;height:16px;cursor:pointer">'
+    + '<span>' + _faConsentHtml() + '</span></label>';
+}
+(function _faA11yInit(){
+  function fix(){
+    try{
+      document.querySelectorAll(
+        'input:not([aria-label]):not([aria-labelledby]):not([type=hidden]):not([type=checkbox]):not([type=radio]), select:not([aria-label]):not([aria-labelledby]), textarea:not([aria-label]):not([aria-labelledby])'
+      ).forEach(function(el){
+        var esc = (window.CSS && CSS.escape) ? CSS.escape(el.id) : el.id;
+        if (el.id && document.querySelector('label[for="'+ esc +'"]')) return;
+        var name = el.getAttribute('placeholder');
+        if (!name){ var fg = el.closest('.field-group'); var lab = fg && fg.querySelector('label'); if (lab) name = lab.textContent.trim(); }
+        if (name) el.setAttribute('aria-label', name);
+      });
+    }catch(e){}
+  }
+  var scheduled=false;
+  function schedule(){ if(scheduled) return; scheduled=true; requestAnimationFrame(function(){ scheduled=false; fix(); }); }
+  if (document.readyState !== 'loading') schedule(); else document.addEventListener('DOMContentLoaded', schedule);
+  try{ new MutationObserver(schedule).observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
+})();
