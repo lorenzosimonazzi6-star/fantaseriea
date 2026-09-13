@@ -215,6 +215,17 @@
       </button>
       <div class="nav-logo"><span class="nav-logo-full">🏆 Arena<span>SerieA</span></span><span class="nav-logo-short">🏆 <span>SA</span></span></div>
       <div class="nav-right">
+        <div class="game-switch">
+          <button class="nav-switch-btn" id="btnGameSwitch" type="button" aria-haspopup="true" aria-expanded="false" title="Cambia gioco" aria-label="Cambia gioco"><span class="material-symbols-outlined">grid_view</span></button>
+          <div class="game-switch-menu" id="gameSwitchMenu" role="menu" aria-label="Giochi Fantasy Arena">
+            <a role="menuitem" href="https://fantaarena.it/">🏠 <span>Home</span></a>
+            <div class="game-switch-sep"></div>
+            <a role="menuitem" class="game-switch-link" href="https://fantaarena.it/champions/">⭐ <span>ArenaUCL</span></a>
+            <a role="menuitem" class="game-switch-link" href="https://fantaarena.it/mondiali/">🌍 <span>ArenaMondiali</span></a>
+            <a role="menuitem" class="game-switch-link current" aria-current="page" href="https://fantaarena.it/seriea/">🇮🇹 <span>ArenaSerieA</span></a>
+            <a role="menuitem" class="game-switch-link" href="https://fantaarena.it/premier/">🏴 <span>ArenaBPL</span></a>
+          </div>
+        </div>
         <button class="nav-lang-btn" id="langSwitcher" onclick="toggleLang()" title="Switch language">🇬🇧 EN</button>
         <button class="nav-push-btn" id="btnPushToggle" title="Notifiche">🔔</button>
         <button class="nav-profile-btn" id="btnSidebar" onclick="toggleSidebar()" title="Profilo e Leghe" data-i18n-title="nav.profile_title">

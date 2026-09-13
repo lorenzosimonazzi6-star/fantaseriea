@@ -5499,3 +5499,22 @@ function _faConsentField(id){
   if (document.readyState !== 'loading') schedule(); else document.addEventListener('DOMContentLoaded', schedule);
   try{ new MutationObserver(schedule).observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
 })();
+
+
+/* ── Game switcher: apertura/chiusura menu cambia-gioco (aggiunto) ── */
+(function _faGameSwitch(){
+  function init(){
+    var btn = document.getElementById("btnGameSwitch");
+    var menu = document.getElementById("gameSwitchMenu");
+    if (!btn || !menu) return;
+    function close(){ menu.classList.remove("open"); btn.setAttribute("aria-expanded","false"); }
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var open = menu.classList.toggle("open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", function(e){ if (!menu.contains(e.target) && e.target !== btn) close(); });
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape") close(); });
+  }
+  if (document.readyState !== "loading") init(); else document.addEventListener("DOMContentLoaded", init);
+})();
